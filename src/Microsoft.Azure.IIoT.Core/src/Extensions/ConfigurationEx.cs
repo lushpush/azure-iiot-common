@@ -14,19 +14,38 @@ namespace Microsoft.Extensions.Configuration {
     public static class ConfigurationEx {
 
         /// <summary>
-        /// Adds .env file environment variables
+        /// Adds .env file environment variables from an .env file that is in current
+        /// folder or below up to root.
         /// </summary>
         /// <param name="builder"></param>
         /// <returns></returns>
         public static IConfigurationBuilder AddDotEnvFile(this IConfigurationBuilder builder) {
-            var curDir = Environment.CurrentDirectory;
             try {
+                // Find .env file
+                var curDir = Environment.CurrentDirectory;
                 while (!string.IsNullOrEmpty(curDir) && !File.Exists(Path.Combine(curDir, ".env"))) {
-                    // Find .env file
                     curDir = Path.GetDirectoryName(Environment.CurrentDirectory);
                 }
                 if (!string.IsNullOrEmpty(curDir)) {
-                    var lines = File.ReadAllLines(Path.Combine(curDir, ".env"));
+                    builder.AddDotEnvFile(Path.Combine(curDir, ".env"));
+                }
+            }
+            catch (IOException) { }
+            return builder;
+        }
+
+
+        /// <summary>
+        /// Adds .env file environment variables
+        /// </summary>
+        /// <param name="builder"></param>
+        /// <param name="filePath"></param>
+        /// <returns></returns>
+        public static IConfigurationBuilder AddDotEnvFile(this IConfigurationBuilder builder,
+            string filePath) {
+            if (!string.IsNullOrEmpty(filePath)) {
+                try {
+                    var lines = File.ReadAllLines(filePath);
                     var values = new Dictionary<string, string>();
                     foreach (var line in lines) {
                         var offset = line.IndexOf('=');
@@ -41,8 +60,8 @@ namespace Microsoft.Extensions.Configuration {
                     }
                     builder.AddInMemoryCollection(values);
                 }
+                catch (IOException) { }
             }
-            catch (IOException) { }
             return builder;
         }
     }
