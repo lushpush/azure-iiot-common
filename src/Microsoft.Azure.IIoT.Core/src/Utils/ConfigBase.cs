@@ -27,9 +27,10 @@ namespace Microsoft.Azure.IIoT.Utils {
             Configuration = configuration;
 
             if (configuration == null) {
-                var builder = new ConfigurationBuilder();
-                builder.AddEnvironmentVariables();
-                configuration = builder.Build();
+                configuration = new ConfigurationBuilder()
+                    .AddFromDotEnvFile()
+                    .AddEnvironmentVariables()
+                    .Build();
             }
         }
 
