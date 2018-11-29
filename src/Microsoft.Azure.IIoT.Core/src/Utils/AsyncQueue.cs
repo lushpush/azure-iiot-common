@@ -12,9 +12,10 @@ namespace System.Collections.Concurrent {
 
     /// <summary>
     /// Provides an asynchronous waitable queue.
+    /// Based on ParallelExtensions sample implementation.
     /// </summary>
-    [DebuggerDisplay("Count={CurrentCount}")]
-    public sealed class AsyncQueue<T> : IDisposable, IEnumerable<T> {
+    [DebuggerDisplay("Count={Count}")]
+    public class AsyncQueue<T> : IDisposable, IEnumerable<T> {
 
         /// <summary>
         /// Gets the number of elements in the collection.
@@ -74,6 +75,7 @@ namespace System.Collections.Concurrent {
 
         /// <inheritdoc/>
         IEnumerator IEnumerable.GetEnumerator() => _collection.GetEnumerator();
+
         /// <inheritdoc/>
         public void Dispose() => _semaphore.Dispose();
 
