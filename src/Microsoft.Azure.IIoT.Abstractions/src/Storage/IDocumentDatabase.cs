@@ -4,27 +4,36 @@
 // ------------------------------------------------------------
 
 namespace Microsoft.Azure.IIoT.Storage {
-    using System;
     using System.Collections.Generic;
     using System.Threading;
     using System.Threading.Tasks;
 
     /// <summary>
-    /// List of documents
+    /// Represents a document database
     /// </summary>
-    public interface IDocumentFeed : IDisposable {
+    public interface IDocumentDatabase {
 
         /// <summary>
-        /// Returns whether there is more data in the feed
+        /// Opens or creates a collection.
         /// </summary>
+        /// <param name="id"></param>
         /// <returns></returns>
-        bool HasMore();
+        Task<IDocumentCollection> OpenCollectionAsync(
+            string id = null);
 
         /// <summary>
-        /// Read results from feed
+        /// List all stores in the database
         /// </summary>
+        /// <param name="ct"></param>
         /// <returns></returns>
-        Task<IEnumerable<dynamic>> ReadAsync(
+        Task<IEnumerable<string>> ListCollectionsAsync(
             CancellationToken ct = default(CancellationToken));
+
+        /// <summary>
+        /// Delete collection
+        /// </summary>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        Task DeleteCollectionAsync(string id = null);
     }
 }

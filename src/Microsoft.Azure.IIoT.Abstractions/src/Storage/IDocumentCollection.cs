@@ -5,42 +5,50 @@
 
 namespace Microsoft.Azure.IIoT.Storage {
     using System;
+    using System.Linq.Expressions;
     using System.Threading;
     using System.Threading.Tasks;
 
     /// <summary>
-    /// Represents collection items
+    /// Represents a collection of documents
     /// </summary>
-    public interface IDocumentCollection : IDisposable {
+    public interface IDocumentCollection {
 
         /// <summary>
         /// Adds an item
         /// </summary>
         /// <param name="item"></param>
+        /// <param name="etag"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        Task UpsertAsync<T>(T item, CancellationToken ct);
+        Task<dynamic> UpsertAsync(dynamic item, string etag = null,
+            CancellationToken ct = default(CancellationToken));
+
+        /// <summary>
+        /// Gets the item.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        Task<dynamic> GetAsync(string id,
+            CancellationToken ct = default(CancellationToken));
+
+        /// <summary>
+        /// Query items
+        /// </summary>
+        /// <param name="query"></param>
+        /// <returns></returns>
+        IDocumentFeed QueryAsync(
+            Expression<Func<dynamic, bool>> query);
 
         /// <summary>
         /// Removes the item.
         /// </summary>
-        /// <param name="item"></param>
+        /// <param name="id"></param>
+        /// <param name="etag"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        Task DeleteAsync<T>(T item, CancellationToken ct);
-
-        /// <summary>
-        /// Get all items
-        /// </summary>
-        /// <param name="ct"></param>
-        /// <returns></returns>
-        Task<IDocumentFeed<T>> GetAllAsync<T>(CancellationToken ct);
-
-        /// <summary>
-        /// Removes all items
-        /// </summary>
-        /// <param name="ct"></param>
-        /// <returns></returns>
-        Task DropAllAsync(CancellationToken ct);
+        Task DeleteAsync(string id, string etag = null,
+            CancellationToken ct = default(CancellationToken));
     }
 }

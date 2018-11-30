@@ -3,27 +3,26 @@
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-namespace Microsoft.Azure.IIoT.Storage.Documents {
-    using System.Threading;
-    using System.Threading.Tasks;
+namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
+    using Microsoft.Azure.IIoT.Diagnostics;
+    using Microsoft.Azure.IIoT.Utils;
+    using Microsoft.Azure.Documents.Linq;
     using System.Collections.Generic;
     using System.Linq;
-    using System;
-    using Microsoft.Azure.Documents.Linq;
-    using Microsoft.Azure.IIoT.Utils;
+    using System.Threading;
+    using System.Threading.Tasks;
 
     /// <summary>
     /// Wraps a document query to return statements
     /// </summary>
-    internal class DocumentFeed<I, O> : IDocumentFeed<O> {
+    internal class CosmosDbFeed : IDocumentFeed {
 
         /// <summary>
         /// Create feed
         /// </summary>
-        internal DocumentFeed(IDocumentQuery<I> query,
-            Func<IEnumerable<dynamic>, IEnumerable<O>> convert) {
+        internal CosmosDbFeed(IDocumentQuery<dynamic> query, ILogger logger) {
             _query = query;
-            _convert = convert;
+            _logger = logger;
         }
 
         /// <summary>
@@ -31,14 +30,13 @@ namespace Microsoft.Azure.IIoT.Storage.Documents {
         /// </summary>
         /// <param name="ct"></param>
         /// <returns></returns>
-        public virtual async Task<IEnumerable<O>> ReadAsync(CancellationToken ct) {
-            return await Retry.Do(ct, async () => {
+        public virtual async Task<IEnumerable<dynamic>> ReadAsync(CancellationToken ct) {
+            return await Retry.Do(_logger, ct, async () => {
                 if (_query.HasMoreResults) {
-                    var result = await _query.ExecuteNextAsync(ct)
+                    return await _query.ExecuteNextAsync(ct)
                         .ConfigureAwait(false);
-                    return _convert(result);
                 }
-                return Enumerable.Empty<O>();
+                return Enumerable.Empty<dynamic>();
             }, ResponseUtils.ShouldContinue, ResponseUtils.CustomRetry, int.MaxValue)
                 .ConfigureAwait(false);
         }
@@ -52,7 +50,7 @@ namespace Microsoft.Azure.IIoT.Storage.Documents {
             _query.Dispose();
         }
 
-        private readonly IDocumentQuery<I> _query;
-        private readonly Func<IEnumerable<dynamic>, IEnumerable<O>> _convert;
+        private readonly IDocumentQuery<dynamic> _query;
+        private readonly ILogger _logger;
     }
 }

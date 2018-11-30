@@ -3,7 +3,7 @@
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-namespace Microsoft.Azure.IIoT.Storage.Documents {
+namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
     using Microsoft.Azure.Documents.Client;
     using Microsoft.Azure.Documents;
     using System;
@@ -14,28 +14,35 @@ namespace Microsoft.Azure.IIoT.Storage.Documents {
     using System.Threading;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using Microsoft.Azure.IIoT.Diagnostics;
+    using System.Text;
 
     /// <summary>
-    /// Provides document db and graph functionality for storage interfaces.
+    /// Provides document db database interface.
     /// </summary>
-    public class DocumentServer : IDocumentServer {
+    internal class CosmosDbDatabase : IDocumentDatabase {
 
         /// <summary>
-        /// Creates server with optional change processor implementation
+        /// Database id
         /// </summary>
-        /// <param name="connectionString"></param>
-        public DocumentServer(ConnectionString connectionString) {
-            _connectionString = connectionString ??
-                throw new ArgumentNullException(nameof(connectionString));
-            _client = new DocumentClient(
-                new Uri(_connectionString.AccountEndpoint),
-                _connectionString.AccountKey,
-                new ConnectionPolicy {
-                    ConnectionMode = ConnectionMode.Direct,
-                    ConnectionProtocol = Protocol.Tcp
-                }
-            );
-            _collections = new ConcurrentDictionary<string, DocumentSet>();
+        internal string DatabaseId { get; }
+
+        /// <summary>
+        /// Client
+        /// </summary>
+        internal DocumentClient Client { get; }
+
+        /// <summary>
+        /// Creates server
+        /// </summary>
+        /// <param name="client"></param>
+        /// <param name="id"></param>
+        /// <param name="logger"></param>
+        public CosmosDbDatabase(DocumentClient client, string id, ILogger logger) {
+            _logger = logger;
+            Client = client;
+            _collections = new ConcurrentDictionary<string, CosmosDbCollection>();
+            DatabaseId = id;
         }
 
         /// <summary>
@@ -43,16 +50,16 @@ namespace Microsoft.Azure.IIoT.Storage.Documents {
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>
-        public async Task<IDocumentCollection> OpenGraphCollectionAsync(string id) {
+        public async Task<IDocumentCollection> OpenCollectionAsync(string id) {
             if (string.IsNullOrEmpty(id)) {
                 id = "default";
             }
             if (!_collections.TryGetValue(id, out var collection)) {
-                var coll = await EnsureCollectionExists(id).ConfigureAwait(false);
+                var coll = await EnsureCollectionExists(id);
                 collection = _collections.GetOrAdd(id, k =>
-                    new DocumentSet(this, _client, _connectionString.Database, coll));
+                    new CosmosDbCollection(this, coll, _logger));
             }
-            return new GraphCollection(collection);
+            return collection;
         }
 
         /// <summary>
@@ -64,11 +71,11 @@ namespace Microsoft.Azure.IIoT.Storage.Documents {
             var continuation = string.Empty;
             var result = new List<string>();
             do {
-                var response = await _client.ReadDocumentCollectionFeedAsync(
-                    UriFactory.CreateDatabaseUri(_connectionString.Database),
+                var response = await Client.ReadDocumentCollectionFeedAsync(
+                    UriFactory.CreateDatabaseUri(DatabaseId),
                     new FeedOptions {
                         RequestContinuation = continuation
-                    }).ConfigureAwait(false);
+                    });
                 continuation = response.ResponseContinuation;
                 result.AddRange(response.Select(c => c.Id));
             }
@@ -85,23 +92,17 @@ namespace Microsoft.Azure.IIoT.Storage.Documents {
             if (string.IsNullOrEmpty(id)) {
                 throw new ArgumentNullException(nameof(id));
             }
-            await _client.DeleteDocumentCollectionAsync(
-                UriFactory.CreateDocumentCollectionUri(_connectionString.Database, id))
-                .ConfigureAwait(false);
-            if (_collections.TryRemove(id, out var collection)) {
-                collection.Dispose();
-            }
+            await Client.DeleteDocumentCollectionAsync(
+                UriFactory.CreateDocumentCollectionUri(DatabaseId, id));
+            _collections.TryRemove(id, out var collection);
         }
 
         /// <summary>
         /// Dispose
         /// </summary>
         public void Dispose() {
-            foreach (var collection in _collections) {
-                collection.Value.Dispose();
-            }
             _collections.Clear();
-            _client.Dispose();
+            Client.Dispose();
         }
 
         /// <summary>
@@ -110,11 +111,11 @@ namespace Microsoft.Azure.IIoT.Storage.Documents {
         /// <param name="id"></param>
         /// <returns></returns>
         private async Task<DocumentCollection> EnsureCollectionExists(string id) {
-            var database = await _client.CreateDatabaseIfNotExistsAsync(
+            var database = await Client.CreateDatabaseIfNotExistsAsync(
                 new Database {
-                    Id = _connectionString.Database
+                    Id = DatabaseId
                 }
-            ).ConfigureAwait(false);
+            );
 
             var collectionDefinition = new DocumentCollection {
                 Id = id,
@@ -125,17 +126,16 @@ namespace Microsoft.Azure.IIoT.Storage.Documents {
             };
 
             var throughput = 10000;
-
-            var collection = await _client.CreateDocumentCollectionIfNotExistsAsync(
-                 UriFactory.CreateDatabaseUri(_connectionString.Database),
+            var collection = await Client.CreateDocumentCollectionIfNotExistsAsync(
+                 UriFactory.CreateDatabaseUri(DatabaseId),
                  collectionDefinition,
                  new RequestOptions {
                      OfferThroughput = throughput
                  }
-            ).ConfigureAwait(false);
+            );
 
-            await CreateSprocIfNotExists(id, BulkUpdateSprocName).ConfigureAwait(false);
-            await CreateSprocIfNotExists(id, BulkDeleteSprocName).ConfigureAwait(false);
+            // await CreateSprocIfNotExists(id, kBulkUpdateSprocName);
+            // await CreateSprocIfNotExists(id, kBulkDeleteSprocName);
             return collection.Resource;
         }
 
@@ -146,30 +146,28 @@ namespace Microsoft.Azure.IIoT.Storage.Documents {
         /// <param name="sprocName"></param>
         /// <returns></returns>
         private async Task CreateSprocIfNotExists(string collectionId, string sprocName) {
-            var assembly = this.GetType().Assembly;
-
+            var assembly = GetType().Assembly;
 #if FALSE
             try {
                 var sprocUri = UriFactory.CreateStoredProcedureUri(
-                    _connectionString.Database, collectionId, sprocName);
-                await _client.DeleteStoredProcedureAsync(sprocUri).ConfigureAwait(false);
+                    DatabaseId, collectionId, sprocName);
+                await _client.DeleteStoredProcedureAsync(sprocUri);
             }
             catch (DocumentClientException) {}
 #endif
-
-            var resource = $"{assembly.GetName().Name}.Script.{sprocName}.js";
+            var resource = $"{assembly.GetName().Name}.Azure.Script.{sprocName}.js";
             using (var stream = assembly.GetManifestResourceStream(resource)) {
                 if (stream == null) {
                     throw new FileNotFoundException(resource + " not found");
                 }
                 var sproc = new StoredProcedure {
                     Id = sprocName,
-                    Body = await stream.ToStringAsync().ConfigureAwait(false)
+                    Body = stream.ReadAsString(Encoding.UTF8)
                 };
                 try {
                     var sprocUri = UriFactory.CreateStoredProcedureUri(
-                        _connectionString.Database, collectionId, sprocName);
-                    await _client.ReadStoredProcedureAsync(sprocUri).ConfigureAwait(false);
+                        DatabaseId, collectionId, sprocName);
+                    await Client.ReadStoredProcedureAsync(sprocUri);
                     return;
                 }
                 catch (DocumentClientException de) {
@@ -177,18 +175,15 @@ namespace Microsoft.Azure.IIoT.Storage.Documents {
                         throw;
                     }
                 }
-                await _client.CreateStoredProcedureAsync(
-                    UriFactory.CreateDocumentCollectionUri(_connectionString.Database,
-                    collectionId), sproc).ConfigureAwait(false);
+                await Client.CreateStoredProcedureAsync(
+                    UriFactory.CreateDocumentCollectionUri(DatabaseId,
+                    collectionId), sproc);
             }
         }
 
-
-        private readonly ConnectionString _connectionString;
-        private readonly DocumentClient _client;
-        private readonly ConcurrentDictionary<string, DocumentSet> _collections;
-
-        internal const string BulkUpdateSprocName = "bulkUpdate";
-        internal const string BulkDeleteSprocName = "bulkDelete";
+        private readonly ILogger _logger;
+        private readonly ConcurrentDictionary<string, CosmosDbCollection> _collections;
+        internal const string kBulkUpdateSprocName = "bulkUpdate";
+        internal const string kBulkDeleteSprocName = "bulkDelete";
     }
 }

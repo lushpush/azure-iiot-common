@@ -14,15 +14,5 @@ namespace Microsoft.Azure.IIoT.Storage.Azure {
         /// Connection string to use (mandatory)
         /// </summary>
         string DbConnectionString { get; }
-
-        /// <summary>
-        /// Database id to use (optional)
-        /// </summary>
-        string DatabaseId { get; }
-
-        /// <summary>
-        /// Name of the collection (optional)
-        /// </summary>
-        string CollectionId { get; }
     }
 }

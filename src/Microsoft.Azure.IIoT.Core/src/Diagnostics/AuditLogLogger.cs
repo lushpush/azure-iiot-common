@@ -3,15 +3,14 @@
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-namespace Microsoft.Azure.IIoT.Storage {
-    using Microsoft.Azure.IIoT.Storage.Models;
-    using Microsoft.Azure.IIoT.Diagnostics;
+namespace Microsoft.Azure.IIoT.Diagnostics {
+    using Microsoft.Azure.IIoT.Diagnostics.Models;
     using System.Threading.Tasks;
 
     /// <summary>
     /// Writes audit log entries to logger
     /// </summary>
-    public class AuditLogLogger : IAuditLogWriter {
+    public class AuditLogLogger : IAuditLogWriter, IAuditLog {
 
         /// <summary>
         /// Create audit logger adapter
@@ -25,6 +24,11 @@ namespace Microsoft.Azure.IIoT.Storage {
         public Task WriteAsync(AuditLogEntryModel entry) {
             _logger.Debug("[OPERATION COMPLETED]", () => entry);
             return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
+        public Task<IAuditLogWriter> OpenAsync(string log) {
+            return Task.FromResult<IAuditLogWriter>(this);
         }
 
         private readonly ILogger _logger;

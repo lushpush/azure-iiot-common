@@ -3,8 +3,9 @@
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-namespace Microsoft.Azure.IIoT.Storage.Azure {
+namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
     using Microsoft.Azure.IIoT.Diagnostics;
+    using Microsoft.Azure.IIoT.Utils;
     using Microsoft.Azure.Documents;
     using Microsoft.Azure.Documents.Client;
     using Microsoft.Azure.Documents.Linq;
@@ -12,188 +13,218 @@ namespace Microsoft.Azure.IIoT.Storage.Azure {
     using System.Collections.Generic;
     using System.Linq;
     using System.Linq.Expressions;
+    using System.Net;
+    using System.Threading;
     using System.Threading.Tasks;
-    using Microsoft.Azure.IIoT.Utils;
 
     /// <summary>
     /// Collection abstraction
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    public class CosmosDbCollection<T> where T : class {
+    internal class CosmosDbCollection : IDocumentCollection {
 
         /// <summary>
         /// Returns collection
         /// </summary>
-        protected DocumentCollection Collection { get; private set; }
+        internal DocumentCollection Collection { get; private set; }
 
         /// <summary>
         /// Create collection
         /// </summary>
-        /// <param name="config"></param>
+        /// <param name="db"></param>
+        /// <param name="collection"></param>
         /// <param name="logger"></param>
-        protected CosmosDbCollection(ICosmosDbConfig config, ILogger logger) {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _config = config;
-            _collectionId = config?.CollectionId ?? typeof(T).Name;
-
-            _db = DocumentDbRepository.CreateAsync(config).Result;
-            CreateCollectionIfNotExistsAsync().Wait();
+        internal CosmosDbCollection(CosmosDbDatabase db, DocumentCollection collection,
+            ILogger logger) {
+            _logger = logger;
+            _db = db;
+            Collection = collection;
         }
 
-        /// <summary>
-        /// Get document by id
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        public async Task<T> GetAsync(string id) {
+        /// <inheritdoc/>
+        public async Task<dynamic> GetAsync(string id, CancellationToken ct) {
             try {
-                Document document = await _db.Client.ReadDocumentAsync(
-                    UriFactory.CreateDocumentUri(_db.DatabaseId, _collectionId, id));
-                return (T)(dynamic)document;
+                return await Retry.Do(_logger, ct, () => _db.Client.ReadDocumentAsync(
+                    UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, id), null, ct),
+                    ResponseUtils.ShouldContinue, ResponseUtils.CustomRetry, kMaxRetries);
             }
             catch (DocumentClientException e) {
-                if (e.StatusCode == System.Net.HttpStatusCode.NotFound) {
+                if (e.StatusCode == HttpStatusCode.NotFound) {
                     return null;
                 }
                 throw;
             }
         }
 
-        /// <summary>
-        /// Query documents
-        /// </summary>
-        /// <param name="queryExpression"></param>
-        /// <returns></returns>
-        public async Task<IEnumerable<T>> QueryAsync(
-            Expression<Func<T, bool>> queryExpression) {
-            var feedOptions = new FeedOptions { MaxItemCount = -1 };
-            var query = _db.Client.CreateDocumentQuery<T>(
-                UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, _collectionId),
-                feedOptions)
-            .Where(queryExpression)
-            .AsDocumentQuery();
-            var results = new List<T>();
-            while (query.HasMoreResults) {
-                results.AddRange(await query.ExecuteNextAsync<T>());
-            }
-            return results;
+        /// <inheritdoc/>
+        public IDocumentFeed QueryAsync(Expression<Func<dynamic, bool>> queryExpression) {
+            var query = _db.Client.CreateDocumentQuery(
+                UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
+                   new FeedOptions {
+                       MaxDegreeOfParallelism = 8,
+                       MaxItemCount = -1,
+                       EnableCrossPartitionQuery = true
+                   })
+                .Where(queryExpression)
+                .AsDocumentQuery();
+            return new CosmosDbFeed(query, _logger);
         }
 
-        /// <summary>
-        /// Get documents
-        /// </summary>
-        /// <param name="queryString"></param>
-        /// <returns></returns>
-        public async Task<IEnumerable<T>> QueryAsync(string queryString) {
-            var feedOptions = new FeedOptions { MaxItemCount = -1 };
-            var query = _db.Client.CreateDocumentQuery<T>(
-                UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, _collectionId),
-                queryString, feedOptions) .AsDocumentQuery();
-            var results = new List<T>();
-            while (query.HasMoreResults) {
-                results.AddRange(await query.ExecuteNextAsync<T>());
-            }
-            return results;
-        }
-
-        /// <summary>
-        /// Create document
-        /// </summary>
-        /// <param name="item"></param>
-        /// <returns></returns>
-        public async Task<Document> CreateAsync(T item) {
-            return await _db.Client.CreateDocumentAsync(
-                UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, _collectionId),
-                item);
-        }
-
-        /// <summary>
-        /// Replace document
-        /// </summary>
-        /// <param name="id"></param>
-        /// <param name="item"></param>
-        /// <param name="eTag"></param>
-        /// <returns></returns>
-        public async Task<Document> UpdateAsync(string id, T item, string eTag) {
-            var ac = new RequestOptions {
+        /// <inheritdoc/>
+        public async Task<dynamic> UpsertAsync(dynamic item, string eTag,
+            CancellationToken ct) {
+            var ac = string.IsNullOrEmpty(eTag) ? null : new RequestOptions {
                 AccessCondition = new AccessCondition {
                     Condition = eTag,
                     Type = AccessConditionType.IfMatch
                 }
             };
-            return await _db.Client.ReplaceDocumentAsync(
-                UriFactory.CreateDocumentUri(_db.DatabaseId, _collectionId, id),
-                item, ac);
+            return await Retry.Do(_logger, ct, () => _db.Client.UpsertDocumentAsync(
+                UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
+                    item, ac, false, ct),
+                ResponseUtils.ShouldContinue, ResponseUtils.CustomRetry, kMaxRetries);
         }
 
-        /// <summary>
-        /// Delete document
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
-        public async Task DeleteAsync(string id) {
-            await _db.Client.DeleteDocumentAsync(UriFactory.CreateDocumentUri(
-                _db.DatabaseId, _collectionId, id));
-        }
-
-        /// <summary>
-        /// Create collection
-        /// </summary>
-        /// <returns></returns>
-        private async Task CreateCollectionIfNotExistsAsync() {
-            Collection = await _db.Client.CreateDocumentCollectionIfNotExistsAsync(
-                UriFactory.CreateDatabaseUri(_db.DatabaseId),
-                new DocumentCollection { Id = _collectionId },
-                new RequestOptions { OfferThroughput = RequestLevelLowest });
-        }
-
-        /// <summary>
-        /// The database abstraction
-        /// </summary>
-        internal sealed class DocumentDbRepository {
-
-            /// <summary>
-            /// Client to use
-            /// </summary>
-            public DocumentClient Client { get; private set; }
-
-            /// <summary>
-            /// Database id
-            /// </summary>
-            public string DatabaseId { get; private set; }
-
-            /// <summary>
-            /// Create database abstraction
-            /// </summary>
-            /// <param name="config"></param>
-            /// <returns></returns>
-            public static async Task<DocumentDbRepository> CreateAsync(
-                ICosmosDbConfig config) {
-                if (string.IsNullOrEmpty(config?.DbConnectionString)) {
-                    throw new ArgumentNullException(nameof(config.DbConnectionString));
+        /// <inheritdoc/>
+        public async Task DeleteAsync(string id, string eTag, CancellationToken ct) {
+            var ac = string.IsNullOrEmpty(eTag) ? null : new RequestOptions {
+                AccessCondition = new AccessCondition {
+                    Condition = eTag,
+                    Type = AccessConditionType.IfMatch
                 }
-                var cs = ConnectionString.Parse(config.DbConnectionString);
-                var client = new DocumentClient(new Uri(cs.Endpoint),
-                    cs.SharedAccessKey);
-                var databaseId = config.DatabaseId;
-                if (string.IsNullOrEmpty(config.DatabaseId)) {
-                    databaseId = "default";
-                }
-                await client.CreateDatabaseIfNotExistsAsync(new Database {
-                    Id = databaseId
-                });
-                return new DocumentDbRepository {
-                    DatabaseId = databaseId,
-                    Client = client
-                };
+            };
+            await Retry.Do(_logger, ct, () => _db.Client.DeleteDocumentAsync(
+                UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, id), ac, ct),
+                ResponseUtils.ShouldContinue, ResponseUtils.CustomRetry, kMaxRetries);
+        }
+
+        /// <summary>
+        /// Bulk add or delete
+        /// </summary>
+        /// <param name="changes"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        public async Task RunBulkUpdateAsync(IDocumentFeed changes, CancellationToken ct) {
+            var uri = UriFactory.CreateStoredProcedureUri(_db.DatabaseId, Collection.Id,
+                CosmosDbDatabase.kBulkUpdateSprocName);
+            var max = kMaxArgs;
+            while (changes.HasMore()) {
+                var items = await changes.ReadAsync(ct);
+                await RunBulkUpdateAsync(items, max, uri, ct);
             }
         }
 
-        private readonly DocumentDbRepository _db;
-        private readonly ICosmosDbConfig _config;
-        private readonly string _collectionId;
-        private readonly ILogger _logger;
-        private const int RequestLevelLowest = 400;
+        /// <summary>
+        /// Bulk add or delete
+        /// </summary>
+        /// <param name="items"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        public Task RunBulkUpdateAsync(IEnumerable<dynamic> items, CancellationToken ct) {
+            var uri = UriFactory.CreateStoredProcedureUri(_db.DatabaseId, Collection.Id,
+                CosmosDbDatabase.kBulkUpdateSprocName);
+            return RunBulkUpdateAsync(items, kMaxArgs, uri,  ct);
+        }
 
+        /// <summary>
+        /// Bulk delete
+        /// </summary>
+        /// <param name="query"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        public async Task RunBulkDeleteAsync(SqlQuerySpec query, CancellationToken ct) {
+            var uri = UriFactory.CreateStoredProcedureUri(_db.DatabaseId, Collection.Id,
+                CosmosDbDatabase.kBulkDeleteSprocName);
+            await Retry.Do(_logger, ct, async () => {
+                while (true) {
+                    dynamic scriptResult = await _db.Client.ExecuteStoredProcedureAsync<dynamic>(
+                        uri, null, query);
+                    Console.WriteLine($"  {scriptResult.deleted} items deleted");
+                    if (!scriptResult.continuation) {
+                        break;
+                    }
+                }
+            }, ResponseUtils.ShouldContinue, ResponseUtils.CustomRetry, kMaxRetries);
+        }
+
+        /// <summary>
+        /// Bulk add or delete
+        /// </summary>
+        /// <param name="items"></param>
+        /// <param name="max"></param>
+        /// <param name="uri"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        private async Task RunBulkUpdateAsync(IEnumerable<dynamic> items, int max, Uri uri,
+            CancellationToken ct) {
+            do {
+                await Retry.Do(_logger, ct, async () => {
+                    var bulk = items.Take(max).ToArray();
+                    Console.WriteLine($"Changing {bulk.Length} items...");
+                    var scriptResult = await _db.Client.ExecuteStoredProcedureAsync<int>(
+                        uri, null, bulk);
+                    Console.WriteLine($"  {scriptResult.Response} items changed...");
+                    items = items.Skip(scriptResult.Response);
+                    if (scriptResult.Response > 100) {
+                        max = (int)(scriptResult.Response * 1.05);
+                    }
+                }, ex => {
+                    if (ex is DocumentClientException dce) {
+                        if (dce.StatusCode == HttpStatusCode.RequestEntityTooLarge ||
+                            dce.StatusCode == HttpStatusCode.RequestTimeout) {
+                            max = (int)(max * 0.7);
+                        }
+                    }
+                    return true;
+                }, ResponseUtils.CustomRetry, kMaxRetries);
+            }
+            while (items.Any());
+        }
+
+        /// <summary>
+        /// Soft delete item
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        public async Task SoftDeleteAsync(string id, CancellationToken ct) {
+            var uri = UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, id);
+            await Retry.Do(_logger, ct, async () => {
+                Resource resource = null;
+                try {
+                    var reply = await _db.Client.ReadDocumentAsync(uri);
+                    resource = reply?.Resource;
+                    if (resource == null) {
+                        return;
+                    }
+                    ResponseUtils.CheckResponse(reply.StatusCode, HttpStatusCode.OK);
+                }
+                catch (DocumentClientException dce)
+                    when (dce.StatusCode == HttpStatusCode.NotFound) {
+                    return;
+                }
+
+                if (resource.GetPropertyValue<bool>("_isDeleted")) {
+                    return;
+                }
+
+                resource.SetPropertyValue("ttl", 300);
+                resource.SetPropertyValue("_isDeleted", true);
+                var requestOptions = new RequestOptions {
+                    AccessCondition = new AccessCondition {
+                        Condition = resource.ETag,
+                        Type = AccessConditionType.IfMatch
+                    }
+                };
+                var response = await _db.Client.ReplaceDocumentAsync(resource.SelfLink,
+                    resource, requestOptions);
+                ResponseUtils.CheckResponse(response.StatusCode, HttpStatusCode.OK,
+                    HttpStatusCode.Created);
+            }, ResponseUtils.ContinueWithPrecondition, ResponseUtils.CustomRetry, kMaxRetries);
+        }
+
+        private readonly CosmosDbDatabase _db;
+        private readonly ILogger _logger;
+        private const int kMaxRetries = 100;
+        private const int kMaxArgs = 5000;
     }
 }

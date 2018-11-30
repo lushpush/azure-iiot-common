@@ -4,8 +4,7 @@
 // ------------------------------------------------------------
 
 namespace Microsoft.Azure.IIoT.Services.Diagnostics {
-    using Microsoft.Azure.IIoT.Storage.Models;
-    using Microsoft.Azure.IIoT.Storage;
+    using Microsoft.Azure.IIoT.Diagnostics.Models;
     using Microsoft.Azure.IIoT.Diagnostics;
     using Microsoft.Azure.IIoT.Http;
     using Microsoft.AspNetCore.Mvc;
@@ -24,13 +23,14 @@ namespace Microsoft.Azure.IIoT.Services.Diagnostics {
         /// </summary>
         /// <param name="auditor"></param>
         /// <param name="logger"></param>
-        public AuditLogFilter(IAuditLogWriter auditor = null, ILogger logger = null) {
+        public AuditLogFilter(IAuditLog auditor = null, ILogger logger = null) {
             _logger = logger ?? new SimpleLogger();
             _auditor = auditor ?? new AuditLogLogger(_logger);
             if (auditor == null) {
                 _logger.Error("No audit log registered, output audit log " +
                     "to passed in logger. Register an audit log service.");
             }
+            _writer = _auditor.OpenAsync(logger.Name).Result;
         }
 
         /// <inheritdoc/>
@@ -93,7 +93,7 @@ namespace Microsoft.Azure.IIoT.Services.Diagnostics {
                 }
             }
             entry.Completed = DateTime.UtcNow;
-            await _auditor.WriteAsync(entry);
+            await _writer.WriteAsync(entry);
 
             // Let user know of the activity / audit id and return session id
             context.HttpContext.Response.Headers.Add(HttpHeader.ActivityId, id);
@@ -103,7 +103,8 @@ namespace Microsoft.Azure.IIoT.Services.Diagnostics {
             }
         }
 
-        private readonly IAuditLogWriter _auditor;
+        private readonly IAuditLog _auditor;
         private readonly ILogger _logger;
+        private readonly IAuditLogWriter _writer;
     }
 }

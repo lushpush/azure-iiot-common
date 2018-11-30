@@ -253,12 +253,10 @@ namespace Microsoft.Azure.IIoT.Module.Framework.Hosting {
                 timeout, null);
             MethodResponse response;
             if (string.IsNullOrEmpty(moduleId)) {
-                response = await _client.InvokeMethodAsync(deviceId, request,
-                    CancellationToken.None);
+                response = await _client.InvokeMethodAsync(deviceId, request);
             }
             else {
-                response = await _client.InvokeMethodAsync(deviceId, moduleId, request,
-                    CancellationToken.None);
+                response = await _client.InvokeMethodAsync(deviceId, moduleId, request);
             }
             if (response.Status != 200) {
                 throw new MethodCallStatusException(

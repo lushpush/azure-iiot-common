@@ -3,7 +3,7 @@
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-namespace Microsoft.Azure.IIoT.Storage.Documents {
+namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
     using Microsoft.Azure.IIoT.Http.Exceptions;
     using Microsoft.Azure.IIoT.Exceptions;
     using Microsoft.Azure.Documents;

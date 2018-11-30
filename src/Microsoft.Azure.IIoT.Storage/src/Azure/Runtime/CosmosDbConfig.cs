@@ -14,18 +14,11 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Runtime {
     public class CosmosDbConfig : ConfigBase, ICosmosDbConfig {
 
         private const string kCosmosDbConnectionString = "CosmosDb:ConnectionString";
-        private const string kCosmosDbCollectionId = "CosmosDb:CollectionId";
-        private const string kCosmosDbDatabaseId = "CosmosDb:DatabaseId";
+
         /// <inheritdoc/>
         public string DbConnectionString => GetStringOrDefault(kCosmosDbConnectionString,
             GetStringOrDefault("PCS_TELEMETRY_DOCUMENTDB_CONNSTRING",
                 GetStringOrDefault("_DB_CS", null)));
-        /// <inheritdoc/>
-        public string DatabaseId =>
-            GetStringOrDefault(kCosmosDbDatabaseId, null);
-        /// <inheritdoc/>
-        public string CollectionId =>
-            GetStringOrDefault(kCosmosDbCollectionId, null);
 
         /// <summary>
         /// Configuration constructor

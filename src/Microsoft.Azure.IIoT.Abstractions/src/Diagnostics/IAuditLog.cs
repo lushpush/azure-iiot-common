@@ -3,19 +3,19 @@
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-namespace Microsoft.Azure.IIoT.Storage.Documents {
-    using Microsoft.Azure.Documents;
-    using Newtonsoft.Json.Linq;
+namespace Microsoft.Azure.IIoT.Diagnostics {
+    using System.Threading.Tasks;
 
-    public static class DocumentEx {
+    /// <summary>
+    /// Audit log
+    /// </summary>
+    public interface IAuditLog {
 
         /// <summary>
-        /// Convert document to json object
+        /// Opens the named audit log
         /// </summary>
-        /// <param name="doc"></param>
+        /// <param name="log"></param>
         /// <returns></returns>
-        public static JObject ToJObject(this Document doc) {
-            return (JObject)((dynamic)doc);
-        }
+        Task<IAuditLogWriter> OpenAsync(string log);
     }
 }
