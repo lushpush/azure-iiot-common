@@ -33,7 +33,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         internal DocumentClient Client { get; }
 
         /// <summary>
-        /// Creates server
+        /// Creates database
         /// </summary>
         /// <param name="client"></param>
         /// <param name="id"></param>
@@ -45,11 +45,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
             DatabaseId = id;
         }
 
-        /// <summary>
-        /// Open collection as graph collection.
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public async Task<IDocumentCollection> OpenCollectionAsync(string id) {
             if (string.IsNullOrEmpty(id)) {
                 id = "default";
@@ -62,11 +58,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
             return collection;
         }
 
-        /// <summary>
-        /// Read list of collections
-        /// </summary>
-        /// <param name="ct"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public async Task<IEnumerable<string>> ListCollectionsAsync(CancellationToken ct) {
             var continuation = string.Empty;
             var result = new List<string>();
@@ -83,11 +75,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
             return result;
         }
 
-        /// <summary>
-        /// Delete collection
-        /// </summary>
-        /// <param name="id"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public async Task DeleteCollectionAsync(string id) {
             if (string.IsNullOrEmpty(id)) {
                 throw new ArgumentNullException(nameof(id));
@@ -97,9 +85,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
             _collections.TryRemove(id, out var collection);
         }
 
-        /// <summary>
-        /// Dispose
-        /// </summary>
+        /// <inheritdoc/>
         public void Dispose() {
             _collections.Clear();
             Client.Dispose();

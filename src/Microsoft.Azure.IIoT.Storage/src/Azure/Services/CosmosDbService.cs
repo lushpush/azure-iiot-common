@@ -18,16 +18,6 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
     public class CosmosDbService : IDocumentServer {
 
         /// <summary>
-        /// Client to use
-        /// </summary>
-        public DocumentClient Client { get; private set; }
-
-        /// <summary>
-        /// Database id
-        /// </summary>
-        public string DatabaseId { get; private set; }
-
-        /// <summary>
         /// Creates server
         /// </summary>
         /// <param name="config"></param>
@@ -40,11 +30,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
             }
         }
 
-        /// <summary>
-        /// Create database abstraction
-        /// </summary>
-        /// <param name="databaseId"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public async Task<IDocumentDatabase> OpenAsync(string databaseId) {
             if (string.IsNullOrEmpty(databaseId)) {
                 databaseId = "default";

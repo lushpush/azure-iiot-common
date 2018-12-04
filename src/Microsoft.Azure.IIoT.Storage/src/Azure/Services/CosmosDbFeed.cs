@@ -11,6 +11,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
+    using System;
 
     /// <summary>
     /// Wraps a document query to return statements
@@ -25,22 +26,22 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
             _logger = logger;
         }
 
-        /// <summary>
-        /// Read from feed
-        /// </summary>
-        /// <param name="ct"></param>
-        /// <returns></returns>
+        /// <inheritdoc/>
         public virtual async Task<IEnumerable<dynamic>> ReadAsync(CancellationToken ct) {
-            return await Retry.Do(_logger, ct, async () => {
+            return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                 if (_query.HasMoreResults) {
-                    return await _query.ExecuteNextAsync(ct)
-                        .ConfigureAwait(false);
+                    try {
+                        return await _query.ExecuteNextAsync(ct);
+                    }
+                    catch (Exception ex) {
+                        CosmosDbCollection.FilterException(ex);
+                    }
                 }
                 return Enumerable.Empty<dynamic>();
-            }, ResponseUtils.ShouldContinue, ResponseUtils.CustomRetry, int.MaxValue)
-                .ConfigureAwait(false);
+            });
         }
 
+        /// <inheritdoc/>
         public bool HasMore() => _query.HasMoreResults;
 
         /// <summary>

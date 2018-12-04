@@ -6,6 +6,9 @@
 namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
     using Microsoft.Azure.IIoT.Diagnostics;
     using Microsoft.Azure.IIoT.Utils;
+    using Microsoft.Azure.IIoT.Exceptions;
+    using Microsoft.Azure.IIoT.Http.Exceptions;
+    using Microsoft.Azure.IIoT.Http;
     using Microsoft.Azure.Documents;
     using Microsoft.Azure.Documents.Client;
     using Microsoft.Azure.Documents.Linq;
@@ -41,21 +44,6 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         /// <inheritdoc/>
-        public async Task<dynamic> GetAsync(string id, CancellationToken ct) {
-            try {
-                return await Retry.Do(_logger, ct, () => _db.Client.ReadDocumentAsync(
-                    UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, id), null, ct),
-                    ResponseUtils.ShouldContinue, ResponseUtils.CustomRetry, kMaxRetries);
-            }
-            catch (DocumentClientException e) {
-                if (e.StatusCode == HttpStatusCode.NotFound) {
-                    return null;
-                }
-                throw;
-            }
-        }
-
-        /// <inheritdoc/>
         public IDocumentFeed QueryAsync(Expression<Func<dynamic, bool>> queryExpression) {
             var query = _db.Client.CreateDocumentQuery(
                 UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
@@ -70,31 +58,117 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         /// <inheritdoc/>
-        public async Task<dynamic> UpsertAsync(dynamic item, string eTag,
-            CancellationToken ct) {
-            var ac = string.IsNullOrEmpty(eTag) ? null : new RequestOptions {
-                AccessCondition = new AccessCondition {
-                    Condition = eTag,
-                    Type = AccessConditionType.IfMatch
-                }
-            };
-            return await Retry.Do(_logger, ct, () => _db.Client.UpsertDocumentAsync(
-                UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
-                    item, ac, false, ct),
-                ResponseUtils.ShouldContinue, ResponseUtils.CustomRetry, kMaxRetries);
+        public async Task<dynamic> GetAsync(string id, CancellationToken ct) {
+            try {
+                return await Retry.WithExponentialBackoff(_logger, ct, async () => {
+                    try {
+                        return await _db.Client.ReadDocumentAsync(
+                            UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, id),
+                            null, ct);
+                    }
+                    catch (Exception ex) {
+                        FilterException(ex);
+                        return null;
+                    }
+                });
+            }
+            catch (ResourceNotFoundException) {
+                return null;
+            }
         }
 
         /// <inheritdoc/>
-        public async Task DeleteAsync(string id, string eTag, CancellationToken ct) {
+        public async Task<dynamic> UpsertAsync(dynamic item, string eTag,
+            CancellationToken ct) {
+            if (string.IsNullOrEmpty(eTag)) {
+                eTag = GetEtagFromItem(item);
+            }
             var ac = string.IsNullOrEmpty(eTag) ? null : new RequestOptions {
                 AccessCondition = new AccessCondition {
                     Condition = eTag,
                     Type = AccessConditionType.IfMatch
                 }
             };
-            await Retry.Do(_logger, ct, () => _db.Client.DeleteDocumentAsync(
-                UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, id), ac, ct),
-                ResponseUtils.ShouldContinue, ResponseUtils.CustomRetry, kMaxRetries);
+            return await Retry.WithExponentialBackoff(_logger, ct, async () => {
+                try {
+                    return await _db.Client.UpsertDocumentAsync(
+                        UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
+                        item, ac, false, ct);
+                }
+                catch (Exception ex) {
+                    FilterException(ex);
+                    return null;
+                }
+            });
+        }
+
+        /// <inheritdoc/>
+        public async Task DeleteAsync(dynamic item, string eTag, CancellationToken ct) {
+            var id = GetIdFromItem(item);
+            if (id == null) {
+                throw new ArgumentException("Item is missing id");
+            }
+            if (string.IsNullOrEmpty(eTag)) {
+                eTag = GetEtagFromItem(item);
+            }
+            var ac = string.IsNullOrEmpty(eTag) ? null : new RequestOptions {
+                AccessCondition = new AccessCondition {
+                    Condition = eTag,
+                    Type = AccessConditionType.IfMatch
+                }
+            };
+            await Retry.WithExponentialBackoff(_logger, ct, async () => {
+                try {
+                    await _db.Client.DeleteDocumentAsync(
+                        UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, id),
+                        ac, ct);
+                }
+                catch (Exception ex) {
+                    FilterException(ex);
+                    return;
+                }
+            });
+        }
+
+        /// <summary>
+        /// Filter exceptions
+        /// </summary>
+        /// <param name="ex"></param>
+        /// <returns></returns>
+        internal static void FilterException(Exception ex) {
+            if (ex is HttpResponseException re) {
+                re.StatusCode.Validate(re.Message);
+            }
+            else if (ex is DocumentClientException dce && dce.StatusCode.HasValue) {
+                if (dce.StatusCode == (HttpStatusCode)429) {
+                    throw new TemporarilyBusyException(dce.Message, dce, dce.RetryAfter);
+                }
+                dce.StatusCode.Value.Validate(dce.Message, dce);
+            }
+        }
+
+        /// <summary>
+        /// Return etag from item
+        /// </summary>
+        /// <param name="item"></param>
+        /// <returns></returns>
+        private static string GetEtagFromItem(dynamic item) =>
+            Try.Op(() => (string)item.__etag);
+
+        /// <summary>
+        /// Return id from item
+        /// </summary>
+        /// <param name="item"></param>
+        /// <returns></returns>
+        private static string GetIdFromItem(dynamic item) {
+            var id = Try.Op(() => (string)item.Id);
+            if (string.IsNullOrEmpty(id)) {
+                id = Try.Op(() => (string)item.__id);
+                if (string.IsNullOrEmpty(id)) {
+                    id = Try.Op(() => (string)item);
+                }
+            }
+            return id;
         }
 
         /// <summary>
@@ -125,6 +199,8 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
             return RunBulkUpdateAsync(items, kMaxArgs, uri,  ct);
         }
 
+        private const int kMaxArgs = 5000;
+
         /// <summary>
         /// Bulk delete
         /// </summary>
@@ -134,16 +210,21 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         public async Task RunBulkDeleteAsync(SqlQuerySpec query, CancellationToken ct) {
             var uri = UriFactory.CreateStoredProcedureUri(_db.DatabaseId, Collection.Id,
                 CosmosDbDatabase.kBulkDeleteSprocName);
-            await Retry.Do(_logger, ct, async () => {
+            await Retry.WithoutDelay(_logger, ct, async () => {
                 while (true) {
-                    dynamic scriptResult = await _db.Client.ExecuteStoredProcedureAsync<dynamic>(
-                        uri, null, query);
-                    Console.WriteLine($"  {scriptResult.deleted} items deleted");
-                    if (!scriptResult.continuation) {
-                        break;
+                    try {
+                        dynamic scriptResult = await _db.Client.ExecuteStoredProcedureAsync<dynamic>(
+                            uri, null, query);
+                        Console.WriteLine($"  {scriptResult.deleted} items deleted");
+                        if (!scriptResult.continuation) {
+                            break;
+                        }
+                    }
+                    catch (Exception ex) {
+                        FilterException(ex);
                     }
                 }
-            }, ResponseUtils.ShouldContinue, ResponseUtils.CustomRetry, kMaxRetries);
+            });
         }
 
         /// <summary>
@@ -157,74 +238,36 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         private async Task RunBulkUpdateAsync(IEnumerable<dynamic> items, int max, Uri uri,
             CancellationToken ct) {
             do {
-                await Retry.Do(_logger, ct, async () => {
-                    var bulk = items.Take(max).ToArray();
-                    Console.WriteLine($"Changing {bulk.Length} items...");
-                    var scriptResult = await _db.Client.ExecuteStoredProcedureAsync<int>(
-                        uri, null, bulk);
-                    Console.WriteLine($"  {scriptResult.Response} items changed...");
-                    items = items.Skip(scriptResult.Response);
-                    if (scriptResult.Response > 100) {
-                        max = (int)(scriptResult.Response * 1.05);
+                await Retry.WithoutDelay(_logger, ct, async () => {
+                    try {
+                        var bulk = items.Take(max).ToArray();
+                        Console.WriteLine($"Changing {bulk.Length} items...");
+                        var scriptResult = await _db.Client.ExecuteStoredProcedureAsync<int>(
+                            uri, null, bulk);
+                        Console.WriteLine($"  {scriptResult.Response} items changed...");
+                        items = items.Skip(scriptResult.Response);
+                        if (scriptResult.Response > 100) {
+                            max = (int)(scriptResult.Response * 1.05);
+                        }
                     }
-                }, ex => {
-                    if (ex is DocumentClientException dce) {
+                    catch (DocumentClientException dce) {
                         if (dce.StatusCode == HttpStatusCode.RequestEntityTooLarge ||
                             dce.StatusCode == HttpStatusCode.RequestTimeout) {
                             max = (int)(max * 0.7);
                         }
+                        else {
+                            FilterException(dce);
+                        }
                     }
-                    return true;
-                }, ResponseUtils.CustomRetry, kMaxRetries);
+                    catch (Exception ex) {
+                        FilterException(ex);
+                    }
+                });
             }
             while (items.Any());
         }
 
-        /// <summary>
-        /// Soft delete item
-        /// </summary>
-        /// <param name="id"></param>
-        /// <param name="ct"></param>
-        /// <returns></returns>
-        public async Task SoftDeleteAsync(string id, CancellationToken ct) {
-            var uri = UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, id);
-            await Retry.Do(_logger, ct, async () => {
-                Resource resource = null;
-                try {
-                    var reply = await _db.Client.ReadDocumentAsync(uri);
-                    resource = reply?.Resource;
-                    if (resource == null) {
-                        return;
-                    }
-                    ResponseUtils.CheckResponse(reply.StatusCode, HttpStatusCode.OK);
-                }
-                catch (DocumentClientException dce)
-                    when (dce.StatusCode == HttpStatusCode.NotFound) {
-                    return;
-                }
-
-                if (resource.GetPropertyValue<bool>("_isDeleted")) {
-                    return;
-                }
-
-                resource.SetPropertyValue("ttl", 300);
-                resource.SetPropertyValue("_isDeleted", true);
-                var requestOptions = new RequestOptions {
-                    AccessCondition = new AccessCondition {
-                        Condition = resource.ETag,
-                        Type = AccessConditionType.IfMatch
-                    }
-                };
-                var response = await _db.Client.ReplaceDocumentAsync(resource.SelfLink,
-                    resource, requestOptions);
-                ResponseUtils.CheckResponse(response.StatusCode, HttpStatusCode.OK,
-                    HttpStatusCode.Created);
-            }, ResponseUtils.ContinueWithPrecondition, ResponseUtils.CustomRetry, kMaxRetries);
-        }
-
         private readonly CosmosDbDatabase _db;
         private readonly ILogger _logger;
-        private const int kMaxRetries = 100;
-        private const int kMaxArgs = 5000;
     }
 }

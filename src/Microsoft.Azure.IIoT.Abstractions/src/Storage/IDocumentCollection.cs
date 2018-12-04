@@ -4,6 +4,7 @@
 // ------------------------------------------------------------
 
 namespace Microsoft.Azure.IIoT.Storage {
+    using Microsoft.Azure.IIoT.Exceptions;
     using System;
     using System.Linq.Expressions;
     using System.Threading;
@@ -15,8 +16,11 @@ namespace Microsoft.Azure.IIoT.Storage {
     public interface IDocumentCollection {
 
         /// <summary>
-        /// Adds an item
+        /// Adds or updates an item.  If etag is not provided,
+        /// tries to read etag from the dynamic object based
+        /// on implementation.
         /// </summary>
+        /// <exception cref="ResourceOutOfDateException"/>
         /// <param name="item"></param>
         /// <param name="etag"></param>
         /// <param name="ct"></param>
@@ -42,13 +46,15 @@ namespace Microsoft.Azure.IIoT.Storage {
             Expression<Func<dynamic, bool>> query);
 
         /// <summary>
-        /// Removes the item.
+        /// Removes the item using the passed in id or the item
+        /// object itself.
         /// </summary>
-        /// <param name="id"></param>
-        /// <param name="etag"></param>
+        /// <exception cref="ResourceOutOfDateException"/>
+        /// <param name="itemOrId"></param>
+        /// <param name="eTag"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        Task DeleteAsync(string id, string etag = null,
+        Task DeleteAsync(dynamic itemOrId, string eTag = null,
             CancellationToken ct = default(CancellationToken));
     }
 }
