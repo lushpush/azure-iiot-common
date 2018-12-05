@@ -23,7 +23,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
     /// <summary>
     /// Collection abstraction
     /// </summary>
-    internal class CosmosDbCollection : IDocumentCollection {
+    internal class CosmosDbCollection : IDocumentCollection, ISqlQueryable {
 
         /// <summary>
         /// Returns collection
@@ -44,17 +44,39 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         /// <inheritdoc/>
-        public IDocumentFeed QueryAsync(Expression<Func<dynamic, bool>> queryExpression) {
-            var query = _db.Client.CreateDocumentQuery(
+        public IDocumentFeed Query<T>(Expression<Func<T, bool>> predicate,
+            int? pageSize) {
+
+            var query = _db.Client.CreateDocumentQuery<T>(
                 UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
                    new FeedOptions {
                        MaxDegreeOfParallelism = 8,
-                       MaxItemCount = -1,
+                       MaxItemCount = pageSize ?? - 1,
                        EnableCrossPartitionQuery = true
                    })
-                .Where(queryExpression)
-                .AsDocumentQuery();
-            return new CosmosDbFeed(query, _logger);
+                .Where(predicate)
+                ;
+
+            return new CosmosDbFeed<T>(query.AsDocumentQuery(), _logger);
+        }
+
+        /// <inheritdoc/>
+        public IDocumentFeed Query(string queryString, IDictionary<string, object> parameters,
+            int? pageSize) {
+            var query = _db.Client.CreateDocumentQuery(
+                UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
+                new SqlQuerySpec {
+                    QueryText = queryString,
+                    Parameters = new SqlParameterCollection(parameters?
+                        .Select(kv => new SqlParameter(kv.Key, kv.Value)) ??
+                            Enumerable.Empty<SqlParameter>())
+                },
+                new FeedOptions {
+                    MaxDegreeOfParallelism = 8,
+                    MaxItemCount = pageSize ?? -1,
+                    EnableCrossPartitionQuery = true
+                });
+            return new CosmosDbFeed<dynamic>(query.AsDocumentQuery(), _logger);
         }
 
         /// <inheritdoc/>
@@ -78,10 +100,10 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         /// <inheritdoc/>
-        public async Task<dynamic> UpsertAsync(dynamic item, string eTag,
-            CancellationToken ct) {
+        public async Task<dynamic> UpsertAsync(dynamic newItem, CancellationToken ct,
+            string eTag) {
             if (string.IsNullOrEmpty(eTag)) {
-                eTag = GetEtagFromItem(item);
+                eTag = GetEtagFromItem(newItem);
             }
             var ac = string.IsNullOrEmpty(eTag) ? null : new RequestOptions {
                 AccessCondition = new AccessCondition {
@@ -93,7 +115,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
                 try {
                     return await _db.Client.UpsertDocumentAsync(
                         UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
-                        item, ac, false, ct);
+                        newItem, ac, false, ct);
                 }
                 catch (Exception ex) {
                     FilterException(ex);
@@ -103,7 +125,51 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         /// <inheritdoc/>
-        public async Task DeleteAsync(dynamic item, string eTag, CancellationToken ct) {
+        public async Task<dynamic> ReplaceAsync(dynamic itemOrId,
+            dynamic newItem, CancellationToken ct, string eTag) {
+            var id = GetIdFromItem(itemOrId);
+            if (id == null) {
+                throw new ArgumentException("Item is missing id");
+            }
+            if (string.IsNullOrEmpty(eTag)) {
+                eTag = GetEtagFromItem(itemOrId);
+            }
+            var ac = string.IsNullOrEmpty(eTag) ? null : new RequestOptions {
+                AccessCondition = new AccessCondition {
+                    Condition = eTag,
+                    Type = AccessConditionType.IfMatch
+                }
+            };
+            return await Retry.WithExponentialBackoff(_logger, ct, async () => {
+                try {
+                    return await _db.Client.ReplaceDocumentAsync(
+                        UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, id),
+                        newItem, ac, ct);
+                }
+                catch (Exception ex) {
+                    FilterException(ex);
+                    return null;
+                }
+            });
+        }
+
+        /// <inheritdoc/>
+        public async Task<dynamic> AddAsync(dynamic newItem, CancellationToken ct) {
+            return await Retry.WithExponentialBackoff(_logger, ct, async () => {
+                try {
+                    return await _db.Client.CreateDocumentAsync(
+                        UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
+                        newItem, null, false, ct);
+                }
+                catch (Exception ex) {
+                    FilterException(ex);
+                    return null;
+                }
+            });
+        }
+
+        /// <inheritdoc/>
+        public async Task DeleteAsync(dynamic item, CancellationToken ct, string eTag) {
             var id = GetIdFromItem(item);
             if (id == null) {
                 throw new ArgumentException("Item is missing id");

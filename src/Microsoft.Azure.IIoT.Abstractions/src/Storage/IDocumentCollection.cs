@@ -16,16 +16,12 @@ namespace Microsoft.Azure.IIoT.Storage {
     public interface IDocumentCollection {
 
         /// <summary>
-        /// Adds or updates an item.  If etag is not provided,
-        /// tries to read etag from the dynamic object based
-        /// on implementation.
+        /// Add new item
         /// </summary>
-        /// <exception cref="ResourceOutOfDateException"/>
-        /// <param name="item"></param>
-        /// <param name="etag"></param>
+        /// <param name="newItem"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        Task<dynamic> UpsertAsync(dynamic item, string etag = null,
+        Task<dynamic> AddAsync(dynamic newItem,
             CancellationToken ct = default(CancellationToken));
 
         /// <summary>
@@ -38,12 +34,39 @@ namespace Microsoft.Azure.IIoT.Storage {
             CancellationToken ct = default(CancellationToken));
 
         /// <summary>
+        /// Replace item
+        /// </summary>
+        /// <param name="itemOrId"></param>
+        /// <param name="eTag"></param>
+        /// <param name="newItem"></param>
+        /// <param name="ct"></param>
+        /// <returns></returns>
+        Task<dynamic> ReplaceAsync(dynamic itemOrId, dynamic newItem,
+            CancellationToken ct = default(CancellationToken),
+            string eTag = null);
+
+        /// <summary>
+        /// Adds or updates an item.  If etag is not provided,
+        /// tries to read etag from the dynamic object based
+        /// on implementation.
+        /// </summary>
+        /// <exception cref="ResourceOutOfDateException"/>
+        /// <param name="newItem"></param>
+        /// <param name="ct"></param>
+        /// <param name="etag"></param>
+        /// <returns></returns>
+        Task<dynamic> UpsertAsync(dynamic newItem,
+            CancellationToken ct = default(CancellationToken),
+            string etag = null);
+
+        /// <summary>
         /// Query items
         /// </summary>
-        /// <param name="query"></param>
+        /// <param name="predicate"></param>
+        /// <param name="pageSize"></param>
         /// <returns></returns>
-        IDocumentFeed QueryAsync(
-            Expression<Func<dynamic, bool>> query);
+        IDocumentFeed Query<T>(Expression<Func<T, bool>> predicate,
+            int? pageSize = null);
 
         /// <summary>
         /// Removes the item using the passed in id or the item
@@ -51,10 +74,11 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// </summary>
         /// <exception cref="ResourceOutOfDateException"/>
         /// <param name="itemOrId"></param>
-        /// <param name="eTag"></param>
         /// <param name="ct"></param>
+        /// <param name="eTag"></param>
         /// <returns></returns>
-        Task DeleteAsync(dynamic itemOrId, string eTag = null,
-            CancellationToken ct = default(CancellationToken));
+        Task DeleteAsync(dynamic itemOrId,
+            CancellationToken ct = default(CancellationToken),
+            string eTag = null);
     }
 }
