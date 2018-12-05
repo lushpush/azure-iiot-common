@@ -157,5 +157,20 @@ namespace System.Linq {
                 yield return factory(i);
             }
         }
+
+        /// <summary>
+        /// Create batches of enumerables
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="items"></param>
+        /// <param name="count"></param>
+        /// <returns></returns>
+        public static IEnumerable<IEnumerable<T>> Batch<T>(this IEnumerable<T> items,
+            int count) {
+            return items
+                .Select((x, i) => Tuple.Create(x, i))
+                .GroupBy(x => x.Item2 / count)
+                .Select(g => g.Select(x => x.Item1));
+        }
     }
 }
