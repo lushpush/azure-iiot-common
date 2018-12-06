@@ -15,7 +15,6 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
     using System;
     using System.Collections.Generic;
     using System.Linq;
-    using System.Linq.Expressions;
     using System.Net;
     using System.Threading;
     using System.Threading.Tasks;
@@ -44,25 +43,27 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         /// <inheritdoc/>
-        public IDocumentFeed Query<T>(Expression<Func<T, bool>> predicate,
+        public IDocumentFeed Query<T>(Func<IQueryable<T>, IQueryable<dynamic>> query,
             int? pageSize) {
-
-            var query = _db.Client.CreateDocumentQuery<T>(
+            if (query == null) {
+                throw new ArgumentNullException(nameof(query));
+            }
+            var result = query(_db.Client.CreateDocumentQuery<T>(
                 UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
                    new FeedOptions {
                        MaxDegreeOfParallelism = 8,
                        MaxItemCount = pageSize ?? - 1,
                        EnableCrossPartitionQuery = true
-                   })
-                .Where(predicate)
-                ;
-
-            return new CosmosDbFeed<T>(query.AsDocumentQuery(), _logger);
+                   }));
+            return new CosmosDbFeed(result.AsDocumentQuery(), _logger);
         }
 
         /// <inheritdoc/>
         public IDocumentFeed Query(string queryString, IDictionary<string, object> parameters,
             int? pageSize) {
+            if (string.IsNullOrEmpty(queryString)) {
+                throw new ArgumentNullException(nameof(queryString));
+            }
             var query = _db.Client.CreateDocumentQuery(
                 UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
                 new SqlQuerySpec {
@@ -76,11 +77,14 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
                     MaxItemCount = pageSize ?? -1,
                     EnableCrossPartitionQuery = true
                 });
-            return new CosmosDbFeed<dynamic>(query.AsDocumentQuery(), _logger);
+            return new CosmosDbFeed(query.AsDocumentQuery(), _logger);
         }
 
         /// <inheritdoc/>
         public async Task<dynamic> GetAsync(string id, CancellationToken ct) {
+            if (string.IsNullOrEmpty(id)) {
+                throw new ArgumentNullException(nameof(id));
+            }
             try {
                 return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                     try {
@@ -102,6 +106,9 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         /// <inheritdoc/>
         public async Task<dynamic> UpsertAsync(dynamic newItem, CancellationToken ct,
             string eTag) {
+            if (newItem == null) {
+                throw new ArgumentNullException(nameof(newItem));
+            }
             if (string.IsNullOrEmpty(eTag)) {
                 eTag = GetEtagFromItem(newItem);
             }
@@ -127,6 +134,9 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         /// <inheritdoc/>
         public async Task<dynamic> ReplaceAsync(dynamic itemOrId,
             dynamic newItem, CancellationToken ct, string eTag) {
+            if (newItem == null) {
+                throw new ArgumentNullException(nameof(newItem));
+            }
             var id = GetIdFromItem(itemOrId);
             if (id == null) {
                 throw new ArgumentException("Item is missing id");
@@ -155,6 +165,9 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
 
         /// <inheritdoc/>
         public async Task<dynamic> AddAsync(dynamic newItem, CancellationToken ct) {
+            if (newItem == null) {
+                throw new ArgumentNullException(nameof(newItem));
+            }
             return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                 try {
                     return await _db.Client.CreateDocumentAsync(

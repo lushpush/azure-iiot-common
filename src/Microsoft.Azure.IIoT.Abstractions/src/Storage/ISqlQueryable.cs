@@ -21,6 +21,5 @@ namespace Microsoft.Azure.IIoT.Storage {
         IDocumentFeed Query(string queryString,
             IDictionary<string, object> parameters = null,
             int? pageSize = null);
-
     }
 }

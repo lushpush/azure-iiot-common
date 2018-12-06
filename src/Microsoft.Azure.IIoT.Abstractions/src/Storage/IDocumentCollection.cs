@@ -6,7 +6,7 @@
 namespace Microsoft.Azure.IIoT.Storage {
     using Microsoft.Azure.IIoT.Exceptions;
     using System;
-    using System.Linq.Expressions;
+    using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
 
@@ -62,10 +62,11 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// <summary>
         /// Query items
         /// </summary>
-        /// <param name="predicate"></param>
+        /// <param name="query"></param>
         /// <param name="pageSize"></param>
         /// <returns></returns>
-        IDocumentFeed Query<T>(Expression<Func<T, bool>> predicate,
+        IDocumentFeed Query<T>(
+            Func<IQueryable<T>, IQueryable<dynamic>> query,
             int? pageSize = null);
 
         /// <summary>

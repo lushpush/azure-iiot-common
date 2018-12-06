@@ -130,14 +130,11 @@ namespace Microsoft.Azure.IIoT.Storage {
             }
 
             /// <inheritdoc/>
-            public IDocumentFeed Query<T>(Expression<Func<T, bool>> predicate,
+            public IDocumentFeed Query<T>(Func<IQueryable<T>, IQueryable<dynamic>> query,
                 int? pageSize) {
-                var pred = predicate.Compile();
-                var results = _data.Values
+                var results = query(_data.Values
                     .Select(d => d.Value.ToObject<T>())
-                    .AsQueryable()
-                    .Where(predicate)
-                    .Select(d => (dynamic)d)
+                    .AsQueryable())
                     .AsEnumerable();
                 var feed = (pageSize == null) ?
                     results.YieldReturn() : results.Batch(pageSize.Value);

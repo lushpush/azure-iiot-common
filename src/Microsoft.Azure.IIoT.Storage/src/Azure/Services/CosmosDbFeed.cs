@@ -16,12 +16,12 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
     /// <summary>
     /// Wraps a document query to return statements
     /// </summary>
-    internal class CosmosDbFeed<T> : IDocumentFeed {
+    internal class CosmosDbFeed : IDocumentFeed {
 
         /// <summary>
         /// Create feed
         /// </summary>
-        internal CosmosDbFeed(IDocumentQuery<T> query, ILogger logger) {
+        internal CosmosDbFeed(IDocumentQuery<dynamic> query, ILogger logger) {
             _query = query;
             _logger = logger;
         }
@@ -51,7 +51,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
             _query.Dispose();
         }
 
-        private readonly IDocumentQuery<T> _query;
+        private readonly IDocumentQuery<dynamic> _query;
         private readonly ILogger _logger;
     }
 }
