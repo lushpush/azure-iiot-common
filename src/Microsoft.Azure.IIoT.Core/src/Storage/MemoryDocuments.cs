@@ -123,7 +123,7 @@ namespace Microsoft.Azure.IIoT.Storage {
             public Task<dynamic> GetAsync(string id, CancellationToken ct) {
                 lock (_data) {
                     if (!_data.TryGetValue(id, out var item)) {
-                        return null;
+                        return Task.FromResult<dynamic>(null);
                     }
                     return Task.FromResult<dynamic>(item.Value);
                 }
@@ -197,7 +197,7 @@ namespace Microsoft.Azure.IIoT.Storage {
                 /// </summary>
                 /// <param name="value"></param>
                 public Document(dynamic value) {
-                    Value = value;
+                    Value = JToken.FromObject(value);
                 }
 
                 /// <summary>
