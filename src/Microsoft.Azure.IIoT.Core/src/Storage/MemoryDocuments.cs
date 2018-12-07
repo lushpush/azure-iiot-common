@@ -31,7 +31,7 @@ namespace Microsoft.Azure.IIoT.Storage {
 
         /// <inheritdoc/>
         public Task<IDocumentDatabase> OpenAsync(string id) {
-            return Task.FromResult<IDocumentDatabase>(_databases.GetOrAdd(id,
+            return Task.FromResult<IDocumentDatabase>(_databases.GetOrAdd(id ?? "",
                 k => new MemoryDatabase(_logger)));
         }
 
@@ -61,7 +61,7 @@ namespace Microsoft.Azure.IIoT.Storage {
 
             /// <inheritdoc/>
             public Task<IDocumentCollection> OpenCollectionAsync(string id) {
-                return Task.FromResult<IDocumentCollection>(_collections.GetOrAdd(id,
+                return Task.FromResult<IDocumentCollection>(_collections.GetOrAdd(id ?? "",
                     k => new MemoryCollection(_logger)));
             }
 
