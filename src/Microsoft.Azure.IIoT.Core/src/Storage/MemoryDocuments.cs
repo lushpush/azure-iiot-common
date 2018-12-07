@@ -226,18 +226,18 @@ namespace Microsoft.Azure.IIoT.Storage {
                 /// </summary>
                 public string Id {
                     get {
-                        if (Value is JToken s) {
-                            return s.Type == JTokenType.String ?
-                                (string)s : null;
-                        }
                         if (Value is JObject o) {
-                            if (!o.TryGetValue("Id", out var id)) {
+                            if (!o.TryGetValue("id", StringComparison.CurrentCultureIgnoreCase,
+                                out var id)) {
                                 if (!o.TryGetValue("__id", out id)) {
                                     id = Guid.NewGuid().ToString();
                                     o.Add("__id", id);
                                 }
                             }
                             return (string)id;
+                        }
+                        if (Value is JToken s && s.Type == JTokenType.String ) {
+                            return (string)s;
                         }
                         return null;
                     }
