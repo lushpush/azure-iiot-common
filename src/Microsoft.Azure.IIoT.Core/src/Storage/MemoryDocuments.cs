@@ -85,7 +85,7 @@ namespace Microsoft.Azure.IIoT.Storage {
 
             /// <inheritdoc/>
             public Task<dynamic> AddAsync(dynamic newItem, CancellationToken ct) {
-                var newDoc = new ItemWrapper(newItem);
+                var newDoc = new Document(newItem);
                 lock (_data) {
                     if (_data.TryGetValue(newDoc.Id, out var doc)) {
                         return Task.FromException<dynamic>(
@@ -100,7 +100,7 @@ namespace Microsoft.Azure.IIoT.Storage {
             /// <inheritdoc/>
             public Task DeleteAsync(dynamic itemOrId, CancellationToken ct,
                 string etag) {
-                var newDoc = new ItemWrapper(itemOrId);
+                var newDoc = new Document(itemOrId);
                 lock (_data) {
                     if (!_data.TryGetValue(newDoc.Id, out var doc)) {
                         return Task.FromException<dynamic>(
@@ -144,7 +144,7 @@ namespace Microsoft.Azure.IIoT.Storage {
             /// <inheritdoc/>
             public Task<dynamic> ReplaceAsync(dynamic itemOrId, dynamic newItem,
                 CancellationToken ct, string etag) {
-                var newDoc = new ItemWrapper(newItem);
+                var newDoc = new Document(newItem);
                 lock (_data) {
                     if (_data.TryGetValue(newDoc.Id, out var doc)) {
                         if (string.IsNullOrEmpty(etag)) {
@@ -169,7 +169,7 @@ namespace Microsoft.Azure.IIoT.Storage {
             /// <inheritdoc/>
             public Task<dynamic> UpsertAsync(dynamic newItem, CancellationToken ct,
                 string etag) {
-                var newDoc = new ItemWrapper(newItem);
+                var newDoc = new Document(newItem);
                 lock (_data) {
                     if (_data.TryGetValue(newDoc.Id, out var doc)) {
                         if (string.IsNullOrEmpty(etag)) {
@@ -190,13 +190,13 @@ namespace Microsoft.Azure.IIoT.Storage {
             /// <summary>
             /// Wraps a document value
             /// </summary>
-            private struct ItemWrapper {
+            private struct Document {
 
                 /// <summary>
                 /// Create memory document
                 /// </summary>
                 /// <param name="value"></param>
-                public ItemWrapper(dynamic value) {
+                public Document(dynamic value) {
                     Value = value;
                 }
 
@@ -245,7 +245,7 @@ namespace Microsoft.Azure.IIoT.Storage {
 
                 /// <inheritdoc/>
                 public override bool Equals(object obj) {
-                    if (obj is ItemWrapper wrapper) {
+                    if (obj is Document wrapper) {
                         return JToken.DeepEquals(Value, wrapper.Value);
                     }
                     return false;
@@ -260,11 +260,11 @@ namespace Microsoft.Azure.IIoT.Storage {
                     Value.ToString(Newtonsoft.Json.Formatting.Indented);
 
                 /// <inheritdoc/>
-                public static bool operator ==(ItemWrapper o1, ItemWrapper o2) =>
+                public static bool operator ==(Document o1, Document o2) =>
                     o1.Equals(o2);
 
                 /// <inheritdoc/>
-                public static bool operator !=(ItemWrapper o1, ItemWrapper o2) =>
+                public static bool operator !=(Document o1, Document o2) =>
                     !(o1 == o2);
             }
 
@@ -294,8 +294,8 @@ namespace Microsoft.Azure.IIoT.Storage {
                 private readonly Queue<IEnumerable<dynamic>> _items;
             }
 
-            private readonly Dictionary<string, ItemWrapper> _data =
-                new Dictionary<string, ItemWrapper>();
+            private readonly Dictionary<string, Document> _data =
+                new Dictionary<string, Document>();
             private ILogger _logger;
         }
 
