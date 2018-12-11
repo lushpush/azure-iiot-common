@@ -20,8 +20,8 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// <param name="callback"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        public static async Task ForEachAsync(this IDocumentFeed feed,
-            Func<dynamic, Task> callback,
+        public static async Task ForEachAsync<T>(this IDocumentFeed<T> feed,
+            Func<T, Task> callback,
             CancellationToken ct = default(CancellationToken)) {
             while (feed.HasMore()) {
                 var results = await feed.ReadAsync(ct);

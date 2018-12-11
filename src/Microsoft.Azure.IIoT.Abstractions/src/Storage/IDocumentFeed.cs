@@ -12,7 +12,7 @@ namespace Microsoft.Azure.IIoT.Storage {
     /// <summary>
     /// List of documents
     /// </summary>
-    public interface IDocumentFeed : IDisposable {
+    public interface IDocumentFeed<T> : IDisposable {
 
         /// <summary>
         /// Returns whether there is more data in the feed
@@ -24,7 +24,7 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// Read results from feed
         /// </summary>
         /// <returns></returns>
-        Task<IEnumerable<dynamic>> ReadAsync(
+        Task<IEnumerable<T>> ReadAsync(
             CancellationToken ct = default(CancellationToken));
     }
 }

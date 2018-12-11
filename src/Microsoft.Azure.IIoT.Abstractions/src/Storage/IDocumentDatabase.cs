@@ -17,9 +17,10 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// Opens or creates a collection.
         /// </summary>
         /// <param name="id"></param>
+        /// <param name="partitioned"></param>
         /// <returns></returns>
         Task<IDocumentCollection> OpenCollectionAsync(
-            string id = null);
+            string id = null, bool partitioned = false);
 
         /// <summary>
         /// List all stores in the database

@@ -16,28 +16,28 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
     /// <summary>
     /// Wraps a document query to return statements
     /// </summary>
-    internal class CosmosDbFeed : IDocumentFeed {
+    internal class CosmosDbFeed<T> : IDocumentFeed<T> {
 
         /// <summary>
         /// Create feed
         /// </summary>
-        internal CosmosDbFeed(IDocumentQuery<dynamic> query, ILogger logger) {
+        internal CosmosDbFeed(IDocumentQuery<T> query, ILogger logger) {
             _query = query;
             _logger = logger;
         }
 
         /// <inheritdoc/>
-        public virtual async Task<IEnumerable<dynamic>> ReadAsync(CancellationToken ct) {
+        public virtual async Task<IEnumerable<T>> ReadAsync(CancellationToken ct) {
             return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                 if (_query.HasMoreResults) {
                     try {
-                        return await _query.ExecuteNextAsync(ct);
+                        return await _query.ExecuteNextAsync<T>(ct);
                     }
                     catch (Exception ex) {
                         CosmosDbCollection.FilterException(ex);
                     }
                 }
-                return Enumerable.Empty<dynamic>();
+                return Enumerable.Empty<T>();
             });
         }
 
@@ -51,7 +51,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
             _query.Dispose();
         }
 
-        private readonly IDocumentQuery<dynamic> _query;
+        private readonly IDocumentQuery<T> _query;
         private readonly ILogger _logger;
     }
 }

@@ -46,14 +46,15 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         /// <inheritdoc/>
-        public async Task<IDocumentCollection> OpenCollectionAsync(string id) {
+        public async Task<IDocumentCollection> OpenCollectionAsync(string id,
+            bool partitioned) {
             if (string.IsNullOrEmpty(id)) {
                 id = "default";
             }
             if (!_collections.TryGetValue(id, out var collection)) {
-                var coll = await EnsureCollectionExists(id);
+                var coll = await EnsureCollectionExists(id, partitioned);
                 collection = _collections.GetOrAdd(id, k =>
-                    new CosmosDbCollection(this, coll, _logger));
+                    new CosmosDbCollection(this, coll, partitioned, _logger));
             }
             return collection;
         }
@@ -95,8 +96,10 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         /// Ensures collection exists
         /// </summary>
         /// <param name="id"></param>
+        /// <param name="partitioned"></param>
         /// <returns></returns>
-        private async Task<DocumentCollection> EnsureCollectionExists(string id) {
+        private async Task<DocumentCollection> EnsureCollectionExists(string id,
+            bool partitioned) {
             var database = await Client.CreateDatabaseIfNotExistsAsync(
                 new Database {
                     Id = DatabaseId
@@ -110,6 +113,11 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
                     Precision = -1
                 })
             };
+
+            if (partitioned) {
+                collectionDefinition.PartitionKey.Paths.Add("/" +
+                    CosmosDbCollection.kPartitionKeyProperty);
+            }
 
             var throughput = 10000;
             var collection = await Client.CreateDocumentCollectionIfNotExistsAsync(
@@ -169,7 +177,5 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
 
         private readonly ILogger _logger;
         private readonly ConcurrentDictionary<string, CosmosDbCollection> _collections;
-        internal const string kBulkUpdateSprocName = "bulkUpdate";
-        internal const string kBulkDeleteSprocName = "bulkDelete";
     }
 }

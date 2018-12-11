@@ -18,6 +18,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
     using System.Net;
     using System.Threading;
     using System.Threading.Tasks;
+    using Newtonsoft.Json.Linq;
 
     /// <summary>
     /// Collection abstraction
@@ -34,37 +35,44 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         /// </summary>
         /// <param name="db"></param>
         /// <param name="collection"></param>
+        /// <param name="partitioned"></param>
         /// <param name="logger"></param>
         internal CosmosDbCollection(CosmosDbDatabase db, DocumentCollection collection,
-            ILogger logger) {
+            bool partitioned, ILogger logger) {
             _logger = logger;
+            _partitioned = partitioned;
             _db = db;
             Collection = collection;
         }
 
         /// <inheritdoc/>
-        public IDocumentFeed Query<T>(Func<IQueryable<T>, IQueryable<dynamic>> query,
-            int? pageSize) {
+        public IDocumentFeed<R> Query<T, R>(Func<IQueryable<IDocument<T>>,
+            IQueryable<R>> query, int? pageSize, string partitionKey) {
             if (query == null) {
                 throw new ArgumentNullException(nameof(query));
             }
-            var result = query(_db.Client.CreateDocumentQuery<T>(
+            var pk = _partitioned || string.IsNullOrEmpty(partitionKey) ? null :
+                new PartitionKey(partitionKey);
+            var result = query(_db.Client.CreateDocumentQuery<Document>(
                 UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
                    new FeedOptions {
                        MaxDegreeOfParallelism = 8,
                        MaxItemCount = pageSize ?? - 1,
-                       EnableCrossPartitionQuery = true
-                   }));
-            return new CosmosDbFeed(result.AsDocumentQuery(), _logger);
+                       PartitionKey = pk,
+                       EnableCrossPartitionQuery = pk == null
+                   }).Select(d => (IDocument<T>)new CosmosDbDocument<T>(d)));
+            return new CosmosDbFeed<R>(result.AsDocumentQuery(), _logger);
         }
 
         /// <inheritdoc/>
-        public IDocumentFeed Query(string queryString, IDictionary<string, object> parameters,
-            int? pageSize) {
+        public IDocumentFeed<IDocument<T>> Query<T>(string queryString,
+            IDictionary<string, object> parameters, int? pageSize, string partitionKey) {
             if (string.IsNullOrEmpty(queryString)) {
                 throw new ArgumentNullException(nameof(queryString));
             }
-            var query = _db.Client.CreateDocumentQuery(
+            var pk = _partitioned || string.IsNullOrEmpty(partitionKey) ? null :
+                new PartitionKey(partitionKey);
+            var query = _db.Client.CreateDocumentQuery<Document>(
                 UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
                 new SqlQuerySpec {
                     QueryText = queryString,
@@ -75,22 +83,27 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
                 new FeedOptions {
                     MaxDegreeOfParallelism = 8,
                     MaxItemCount = pageSize ?? -1,
-                    EnableCrossPartitionQuery = true
-                });
-            return new CosmosDbFeed(query.AsDocumentQuery(), _logger);
+                    PartitionKey = pk,
+                    EnableCrossPartitionQuery = pk == null
+                }).Select(d => (IDocument<T>)new CosmosDbDocument<T>(d));
+            return new CosmosDbFeed<IDocument<T>>(query.AsDocumentQuery(), _logger);
         }
 
         /// <inheritdoc/>
-        public async Task<dynamic> GetAsync(string id, CancellationToken ct) {
+        public async Task<IDocument<T>> GetAsync<T>(string id, CancellationToken ct,
+            string partitionKey) {
             if (string.IsNullOrEmpty(id)) {
                 throw new ArgumentNullException(nameof(id));
             }
+            var pk = _partitioned || string.IsNullOrEmpty(partitionKey) ? null :
+                new PartitionKey(partitionKey);
             try {
                 return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                     try {
-                        return await _db.Client.ReadDocumentAsync(
+                        return new CosmosDbDocument<T>(await _db.Client.ReadDocumentAsync(
                             UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, id),
-                            null, ct);
+                            new RequestOptions { PartitionKey = pk }, ct));
+
                     }
                     catch (Exception ex) {
                         FilterException(ex);
@@ -104,25 +117,21 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         /// <inheritdoc/>
-        public async Task<dynamic> UpsertAsync(dynamic newItem, CancellationToken ct,
-            string eTag) {
-            if (newItem == null) {
-                throw new ArgumentNullException(nameof(newItem));
-            }
-            if (string.IsNullOrEmpty(eTag)) {
-                eTag = GetEtagFromItem(newItem);
-            }
-            var ac = string.IsNullOrEmpty(eTag) ? null : new RequestOptions {
-                AccessCondition = new AccessCondition {
-                    Condition = eTag,
-                    Type = AccessConditionType.IfMatch
-                }
+        public async Task<IDocument<T>> UpsertAsync<T>(T newItem,
+            CancellationToken ct, string id, string partitionKey, string etag) {
+            var ac = string.IsNullOrEmpty(etag) ? null : new AccessCondition {
+                Condition = etag,
+                Type = AccessConditionType.IfMatch
             };
+            var pk = _partitioned || string.IsNullOrEmpty(partitionKey) ? null :
+                new PartitionKey(partitionKey);
             return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                 try {
-                    return await _db.Client.UpsertDocumentAsync(
+                    return new CosmosDbDocument<T>(await _db.Client.UpsertDocumentAsync(
                         UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
-                        newItem, ac, false, ct);
+                        GetItem(id, newItem, partitionKey),
+                        new RequestOptions { AccessCondition = ac, PartitionKey = pk },
+                        false, ct));
                 }
                 catch (Exception ex) {
                     FilterException(ex);
@@ -132,29 +141,23 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         /// <inheritdoc/>
-        public async Task<dynamic> ReplaceAsync(dynamic itemOrId,
-            dynamic newItem, CancellationToken ct, string eTag) {
-            if (newItem == null) {
-                throw new ArgumentNullException(nameof(newItem));
+        public async Task<IDocument<T>> ReplaceAsync<T>(IDocument<T> existing,
+            T newItem, CancellationToken ct) {
+            if (existing == null) {
+                throw new ArgumentNullException(nameof(existing));
             }
-            var id = GetIdFromItem(itemOrId);
-            if (id == null) {
-                throw new ArgumentException("Item is missing id");
-            }
-            if (string.IsNullOrEmpty(eTag)) {
-                eTag = GetEtagFromItem(itemOrId);
-            }
-            var ac = string.IsNullOrEmpty(eTag) ? null : new RequestOptions {
-                AccessCondition = new AccessCondition {
-                    Condition = eTag,
-                    Type = AccessConditionType.IfMatch
-                }
+            var ac = string.IsNullOrEmpty(existing.Etag) ? null : new AccessCondition {
+                Condition = existing.Etag,
+                Type = AccessConditionType.IfMatch
             };
+            var pk = _partitioned || string.IsNullOrEmpty(existing.PartitionKey) ? null :
+                new PartitionKey(existing.PartitionKey);
             return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                 try {
-                    return await _db.Client.ReplaceDocumentAsync(
-                        UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, id),
-                        newItem, ac, ct);
+                    return new CosmosDbDocument<T>(await _db.Client.ReplaceDocumentAsync(
+                        UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, existing.Id),
+                        GetItem(existing.Id, newItem, existing.PartitionKey),
+                        new RequestOptions { AccessCondition = ac, PartitionKey = pk }, ct));
                 }
                 catch (Exception ex) {
                     FilterException(ex);
@@ -164,15 +167,16 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         /// <inheritdoc/>
-        public async Task<dynamic> AddAsync(dynamic newItem, CancellationToken ct) {
-            if (newItem == null) {
-                throw new ArgumentNullException(nameof(newItem));
-            }
+        public async Task<IDocument<T>> AddAsync<T>(T newItem, CancellationToken ct,
+            string id, string partitionKey) {
+            var pk = _partitioned || string.IsNullOrEmpty(partitionKey) ? null :
+                new PartitionKey(partitionKey);
             return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                 try {
-                    return await _db.Client.CreateDocumentAsync(
+                    return new CosmosDbDocument<T>(await _db.Client.CreateDocumentAsync(
                         UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
-                        newItem, null, false, ct);
+                        GetItem(id, newItem, partitionKey), new RequestOptions { PartitionKey = pk },
+                        false, ct));
                 }
                 catch (Exception ex) {
                     FilterException(ex);
@@ -182,25 +186,30 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         /// <inheritdoc/>
-        public async Task DeleteAsync(dynamic item, CancellationToken ct, string eTag) {
-            var id = GetIdFromItem(item);
-            if (id == null) {
-                throw new ArgumentException("Item is missing id");
+        public Task DeleteAsync<T>(IDocument<T> item, CancellationToken ct) {
+            if (item == null) {
+                throw new ArgumentNullException(nameof(item));
             }
-            if (string.IsNullOrEmpty(eTag)) {
-                eTag = GetEtagFromItem(item);
+            return DeleteAsync(item.Id, ct, item.PartitionKey, item.Etag);
+        }
+
+        /// <inheritdoc/>
+        public async Task DeleteAsync(string id, CancellationToken ct,
+            string partitionKey, string etag) {
+            if (string.IsNullOrEmpty(id)) {
+                throw new ArgumentNullException(nameof(id));
             }
-            var ac = string.IsNullOrEmpty(eTag) ? null : new RequestOptions {
-                AccessCondition = new AccessCondition {
-                    Condition = eTag,
-                    Type = AccessConditionType.IfMatch
-                }
+            var ac = string.IsNullOrEmpty(etag) ? null : new AccessCondition {
+                Condition = etag,
+                Type = AccessConditionType.IfMatch
             };
+            var pk = _partitioned || string.IsNullOrEmpty(partitionKey) ? null :
+                new PartitionKey(partitionKey);
             await Retry.WithExponentialBackoff(_logger, ct, async () => {
                 try {
                     await _db.Client.DeleteDocumentAsync(
                         UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, id),
-                        ac, ct);
+                        new RequestOptions { AccessCondition = ac, PartitionKey = pk }, ct);
                 }
                 catch (Exception ex) {
                     FilterException(ex);
@@ -227,126 +236,30 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         /// <summary>
-        /// Return etag from item
+        /// Get item
         /// </summary>
-        /// <param name="item"></param>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="id"></param>
+        /// <param name="value"></param>
+        /// <param name="partitionKey"></param>
         /// <returns></returns>
-        private static string GetEtagFromItem(dynamic item) =>
-            Try.Op(() => (string)item.__etag);
-
-        /// <summary>
-        /// Return id from item
-        /// </summary>
-        /// <param name="item"></param>
-        /// <returns></returns>
-        private static string GetIdFromItem(dynamic item) {
-            var id = Try.Op(() => (string)item.Id);
-            if (string.IsNullOrEmpty(id)) {
-                id = Try.Op(() => (string)item.__id);
-                if (string.IsNullOrEmpty(id)) {
-                    id = Try.Op(() => (string)item);
-                }
+        private static dynamic GetItem<T>(string id, T value, string partitionKey) {
+            var token = JObject.FromObject(value);
+            if (partitionKey != null) {
+                token.AddOrUpdate(kPartitionKeyProperty, partitionKey);
             }
-            return id;
-        }
-
-        /// <summary>
-        /// Bulk add or delete
-        /// </summary>
-        /// <param name="changes"></param>
-        /// <param name="ct"></param>
-        /// <returns></returns>
-        public async Task RunBulkUpdateAsync(IDocumentFeed changes, CancellationToken ct) {
-            var uri = UriFactory.CreateStoredProcedureUri(_db.DatabaseId, Collection.Id,
-                CosmosDbDatabase.kBulkUpdateSprocName);
-            var max = kMaxArgs;
-            while (changes.HasMore()) {
-                var items = await changes.ReadAsync(ct);
-                await RunBulkUpdateAsync(items, max, uri, ct);
+            if (id != null) {
+                token.AddOrUpdate(kIdProperty, id);
             }
+            return token;
         }
 
-        /// <summary>
-        /// Bulk add or delete
-        /// </summary>
-        /// <param name="items"></param>
-        /// <param name="ct"></param>
-        /// <returns></returns>
-        public Task RunBulkUpdateAsync(IEnumerable<dynamic> items, CancellationToken ct) {
-            var uri = UriFactory.CreateStoredProcedureUri(_db.DatabaseId, Collection.Id,
-                CosmosDbDatabase.kBulkUpdateSprocName);
-            return RunBulkUpdateAsync(items, kMaxArgs, uri,  ct);
-        }
-
-        private const int kMaxArgs = 5000;
-
-        /// <summary>
-        /// Bulk delete
-        /// </summary>
-        /// <param name="query"></param>
-        /// <param name="ct"></param>
-        /// <returns></returns>
-        public async Task RunBulkDeleteAsync(SqlQuerySpec query, CancellationToken ct) {
-            var uri = UriFactory.CreateStoredProcedureUri(_db.DatabaseId, Collection.Id,
-                CosmosDbDatabase.kBulkDeleteSprocName);
-            await Retry.WithoutDelay(_logger, ct, async () => {
-                while (true) {
-                    try {
-                        dynamic scriptResult = await _db.Client.ExecuteStoredProcedureAsync<dynamic>(
-                            uri, null, query);
-                        Console.WriteLine($"  {scriptResult.deleted} items deleted");
-                        if (!scriptResult.continuation) {
-                            break;
-                        }
-                    }
-                    catch (Exception ex) {
-                        FilterException(ex);
-                    }
-                }
-            });
-        }
-
-        /// <summary>
-        /// Bulk add or delete
-        /// </summary>
-        /// <param name="items"></param>
-        /// <param name="max"></param>
-        /// <param name="uri"></param>
-        /// <param name="ct"></param>
-        /// <returns></returns>
-        private async Task RunBulkUpdateAsync(IEnumerable<dynamic> items, int max, Uri uri,
-            CancellationToken ct) {
-            do {
-                await Retry.WithoutDelay(_logger, ct, async () => {
-                    try {
-                        var bulk = items.Take(max).ToArray();
-                        Console.WriteLine($"Changing {bulk.Length} items...");
-                        var scriptResult = await _db.Client.ExecuteStoredProcedureAsync<int>(
-                            uri, null, bulk);
-                        Console.WriteLine($"  {scriptResult.Response} items changed...");
-                        items = items.Skip(scriptResult.Response);
-                        if (scriptResult.Response > 100) {
-                            max = (int)(scriptResult.Response * 1.05);
-                        }
-                    }
-                    catch (DocumentClientException dce) {
-                        if (dce.StatusCode == HttpStatusCode.RequestEntityTooLarge ||
-                            dce.StatusCode == HttpStatusCode.RequestTimeout) {
-                            max = (int)(max * 0.7);
-                        }
-                        else {
-                            FilterException(dce);
-                        }
-                    }
-                    catch (Exception ex) {
-                        FilterException(ex);
-                    }
-                });
-            }
-            while (items.Any());
-        }
+        internal const string kIdProperty = "id";
+        internal const string kPartitionKeyProperty = "__pk";
 
         private readonly CosmosDbDatabase _db;
         private readonly ILogger _logger;
+        private readonly bool _partitioned;
     }
+
 }

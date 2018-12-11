@@ -17,9 +17,10 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// <param name="queryString"></param>
         /// <param name="parameters"></param>
         /// <param name="pageSize"></param>
+        /// <param name="partitionKey"></param>
         /// <returns></returns>
-        IDocumentFeed Query(string queryString,
+        IDocumentFeed<IDocument<T>> Query<T>(string queryString,
             IDictionary<string, object> parameters = null,
-            int? pageSize = null);
+            int? pageSize = null, string partitionKey = null);
     }
 }

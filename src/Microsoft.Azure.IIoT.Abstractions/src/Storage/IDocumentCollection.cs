@@ -20,66 +20,80 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// </summary>
         /// <param name="newItem"></param>
         /// <param name="ct"></param>
+        /// <param name="id"></param>
+        /// <param name="partitionKey"></param>
         /// <returns></returns>
-        Task<dynamic> AddAsync(dynamic newItem,
-            CancellationToken ct = default(CancellationToken));
+        Task<IDocument<T>> AddAsync<T>(T newItem,
+            CancellationToken ct = default(CancellationToken),
+            string id = null, string partitionKey = null);
 
         /// <summary>
-        /// Gets the item.
+        /// Gets an item.
         /// </summary>
         /// <param name="id"></param>
         /// <param name="ct"></param>
+        /// <param name="partitionKey"></param>
         /// <returns></returns>
-        Task<dynamic> GetAsync(string id,
-            CancellationToken ct = default(CancellationToken));
+        Task<IDocument<T>> GetAsync<T>(string id,
+            CancellationToken ct = default(CancellationToken),
+            string partitionKey = null);
 
         /// <summary>
         /// Replace item
         /// </summary>
-        /// <param name="itemOrId"></param>
-        /// <param name="eTag"></param>
-        /// <param name="newItem"></param>
+        /// <param name="existing"></param>
+        /// <param name="value"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        Task<dynamic> ReplaceAsync(dynamic itemOrId, dynamic newItem,
-            CancellationToken ct = default(CancellationToken),
-            string eTag = null);
+        Task<IDocument<T>> ReplaceAsync<T>(IDocument<T> existing,
+            T value, CancellationToken ct = default(CancellationToken));
 
         /// <summary>
-        /// Adds or updates an item.  If etag is not provided,
-        /// tries to read etag from the dynamic object based
-        /// on implementation.
+        /// Adds or updates an item.
         /// </summary>
         /// <exception cref="ResourceOutOfDateException"/>
         /// <param name="newItem"></param>
         /// <param name="ct"></param>
+        /// <param name="id"></param>
+        /// <param name="partitionKey"></param>
         /// <param name="etag"></param>
         /// <returns></returns>
-        Task<dynamic> UpsertAsync(dynamic newItem,
+        Task<IDocument<T>> UpsertAsync<T>(T newItem,
             CancellationToken ct = default(CancellationToken),
+            string id = null, string partitionKey = null,
             string etag = null);
 
         /// <summary>
         /// Query items
         /// </summary>
         /// <param name="query"></param>
+        /// <param name="partitionKey"></param>
         /// <param name="pageSize"></param>
         /// <returns></returns>
-        IDocumentFeed Query<T>(
-            Func<IQueryable<T>, IQueryable<dynamic>> query,
-            int? pageSize = null);
+        IDocumentFeed<R> Query<T, R>(
+            Func<IQueryable<IDocument<T>>, IQueryable<R>> query,
+            int? pageSize = null, string partitionKey = null);
 
         /// <summary>
-        /// Removes the item using the passed in id or the item
-        /// object itself.
+        /// Removes the item.
         /// </summary>
         /// <exception cref="ResourceOutOfDateException"/>
-        /// <param name="itemOrId"></param>
+        /// <param name="item"></param>
         /// <param name="ct"></param>
-        /// <param name="eTag"></param>
         /// <returns></returns>
-        Task DeleteAsync(dynamic itemOrId,
+        Task DeleteAsync<T>(IDocument<T> item,
+            CancellationToken ct = default(CancellationToken));
+
+        /// <summary>
+        /// Delete an item by id.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="ct"></param>
+        /// <param name="partitionKey"></param>
+        /// <param name="etag"></param>
+        /// <returns></returns>
+        Task DeleteAsync(string id,
             CancellationToken ct = default(CancellationToken),
-            string eTag = null);
+            string partitionKey = null, string etag = null);
     }
 }
