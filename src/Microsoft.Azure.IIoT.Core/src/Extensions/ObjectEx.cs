@@ -4,6 +4,7 @@
 // ------------------------------------------------------------
 
 namespace System {
+    using System.Collections.Generic;
     using System.ComponentModel;
 
     /// <summary>
@@ -25,6 +26,26 @@ namespace System {
                 return false;
             }
             return obj.Equals(that);
+        }
+
+        /// <summary>
+        /// Get default hash code for object
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="obj"></param>
+        /// <returns></returns>
+        public static int GetHashSafe<T>(this T obj) {
+            return EqualityComparer<T>.Default.GetHashCode(obj);
+        }
+
+        /// <summary>
+        /// Get default hash code for object
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="obj"></param>
+        /// <returns></returns>
+        public static int GetHashSafe<T>(this T? obj) where T : struct {
+            return obj == null ? 0 : obj.GetHashCode();
         }
 
         /// <summary>

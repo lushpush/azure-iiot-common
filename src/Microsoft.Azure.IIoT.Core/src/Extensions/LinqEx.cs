@@ -12,7 +12,7 @@ namespace System.Linq {
     /// <summary>
     /// Enumerable extensions
     /// </summary>
-    public static class EnumerableEx {
+    public static class LinqEx {
 
         /// <summary>
         /// Creates a hash set from enumerable or null if enumerable is null.

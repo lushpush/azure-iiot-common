@@ -81,7 +81,7 @@ namespace Microsoft.Azure.IIoT.Net.Scanner {
             _requeued = new ConcurrentQueue<IPEndPoint>();
             _rand = new Random();
 
-            _probePool = EnumerableEx
+            _probePool = LinqEx
                 .Repeat(i => new ConnectProbe(this, i), _maxProbeCount)
                 .ToList();
 

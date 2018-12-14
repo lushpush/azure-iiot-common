@@ -278,6 +278,7 @@ namespace Microsoft.Azure.IIoT.Storage {
                 /// <param name="partitionKey"></param>
                 public Document(string id, T value, string partitionKey) :
                     base (JObject.FromObject(value), id, partitionKey) {
+                    Value = value;
                 }
 
                 /// <inheritdoc/>
@@ -305,7 +306,7 @@ namespace Microsoft.Azure.IIoT.Storage {
 
                 /// <inheritdoc/>
                 public Task<IEnumerable<T>> ReadAsync(CancellationToken ct) =>
-                    Task.FromResult(_items.Dequeue());
+                    Task.FromResult(HasMore() ? _items.Dequeue() : null);
 
                 private readonly Queue<IEnumerable<T>> _items;
             }
