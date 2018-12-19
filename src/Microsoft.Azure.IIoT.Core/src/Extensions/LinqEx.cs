@@ -27,6 +27,18 @@ namespace System.Linq {
         }
 
         /// <summary>
+        /// Creates a sorted set from enumerable or null if enumerable is null.
+        /// </summary>
+        /// <param name="enumerable"></param>
+        /// <returns></returns>
+        public static SortedSet<T> ToSortedSetSafe<T>(this IEnumerable<T> enumerable) {
+            if (enumerable == null) {
+                return null;
+            }
+            return new SortedSet<T>(enumerable);
+        }
+
+        /// <summary>
         /// Flattens a enumerable of enumerables
         /// </summary>
         /// <param name="obj"></param>

@@ -39,6 +39,21 @@ namespace System.Collections.Generic {
         }
 
         /// <summary>
+        /// Safe hash over untyped enumeration
+        /// </summary>
+        /// <param name="seq"></param>
+        /// <returns></returns>
+        public static int SequenceGetHashSafe(this IEnumerable seq) {
+            var hashCode = -932366343;
+            if (seq != null) {
+                foreach (var item in seq) {
+                    hashCode = hashCode * -1521134295 + item.GetHashSafe();
+                }
+            }
+            return hashCode;
+        }
+
+        /// <summary>
         /// Safe sequence equals
         /// </summary>
         /// <typeparam name="T"></typeparam>
@@ -51,6 +66,9 @@ namespace System.Collections.Generic {
                 return true;
             }
             if (seq == null || that == null) {
+                if (!(that?.Any() ?? false)) {
+                    return !(seq?.Any() ?? false);
+                }
                 return false;
             }
             return seq.SequenceEqual(that);
