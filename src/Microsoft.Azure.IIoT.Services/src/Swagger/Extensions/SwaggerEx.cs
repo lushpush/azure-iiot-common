@@ -18,11 +18,12 @@ namespace Swashbuckle.AspNetCore.Swagger {
     using System.IO;
     using System.Linq;
     using Microsoft.Azure.IIoT.Auth.Server;
+    using System.Reflection;
 
     /// <summary>
     /// Configure swagger
     /// </summary>
-    public static class SwaggerEx {
+    public static partial class SwaggerEx {
 
         /// <summary>
         /// Configure swagger
@@ -52,6 +53,10 @@ namespace Swashbuckle.AspNetCore.Swagger {
                 options.IncludeXmlComments(Path.Combine(AppContext.BaseDirectory,
                     config.GetType().Assembly.GetName().Name + ".xml"), true);
 
+                // Add autorest extensions
+                options.SchemaFilter<AutoRestSchemaExtensions>();
+                options.OperationFilter<AutoRestOperationExtensions>();
+
                 // If auth enabled, need to have bearer token to access any api
                 if (config.WithAuth) {
                     var resource = config as IClientConfig;
@@ -64,15 +69,16 @@ namespace Swashbuckle.AspNetCore.Swagger {
                         });
                     }
                     else {
-                        options.AddSecurityDefinition("oauth2", new OAuth2Scheme {
+                        options.AddSecurityDefinition("oauth2_implicit", new OAuth2Scheme {
                             Type = "oauth2",
+                            Description = "Implicit oauth2 token flow.",
                             Flow = "implicit",
                             AuthorizationUrl = resource.GetAuthorityUrl() +
                                 "/oauth2/authorize",
                             Scopes = services.GetRequiredScopes()
-                                .ToDictionary(k => k, k => $"Access {k} operations"),
-                            TokenUrl = resource.GetAuthorityUrl() +
-                                "/oauth2/token"
+                                .ToDictionary(k => k, k => $"Access {k} operations") //,
+                            // TokenUrl = resource.GetAuthorityUrl() +
+                            //     "/oauth2/token"
                         });
                         options.OperationFilter<SecurityRequirementsOperationFilter>();
                     }
@@ -131,6 +137,24 @@ namespace Swashbuckle.AspNetCore.Swagger {
         }
 
         /// <summary>
+        /// Apply extensions for autorest
+        /// </summary>
+        private class AutoRestSchemaExtensions : ISchemaFilter {
+
+            /// <inheritdoc/>
+            public void Apply(Schema schema, SchemaFilterContext context) {
+                var typeInfo = context.SystemType.GetTypeInfo();
+
+                if (typeInfo.IsEnum) {
+                    schema.Extensions.Add(
+                        "x-ms-enum",
+                        new { name = typeInfo.Name, modelAsString = true }
+                    );
+                }
+            }
+        }
+
+        /// <summary>
         /// Gather security operations
         /// </summary>
         private class SecurityRequirementsOperationFilter : IOperationFilter {
@@ -143,11 +167,7 @@ namespace Swashbuckle.AspNetCore.Swagger {
                 _options = options;
             }
 
-            /// <summary>
-            /// Process operation
-            /// </summary>
-            /// <param name="operation"></param>
-            /// <param name="context"></param>
+            /// <inheritdoc/>
             public void Apply(Operation operation, OperationFilterContext context) {
                 var descriptor = context.ApiDescription.ActionDescriptor as
                     ControllerActionDescriptor;
@@ -168,6 +188,43 @@ namespace Swashbuckle.AspNetCore.Swagger {
             }
 
             private readonly IOptions<AuthorizationOptions> _options;
+        }
+
+        /// <summary>
+        /// Add autorest operation extensions 
+        /// </summary>
+        private class AutoRestOperationExtensions : IOperationFilter {
+
+            /// <inheritdoc/>
+            public void Apply(Operation operation, OperationFilterContext context) {
+                var descriptor = context.ApiDescription.ActionDescriptor as
+                ControllerActionDescriptor;
+                var attribute = descriptor.MethodInfo.GetCustomAttributes<AutoRestExtensionAttribute>().FirstOrDefault();
+                if (attribute != null) {
+                    if (attribute.LongRunning) {
+                        operation.Extensions.Add("x-ms-long-running-operation", true);
+                    }
+                    if (!string.IsNullOrEmpty(attribute.ContinuationTokenLinkName)) {
+                        operation.Extensions.Add("x-ms-pageable",
+                            new Dictionary<string, string> {
+                                { "nextLinkName", attribute.ContinuationTokenLinkName }
+                            });
+                    }
+                    if (attribute.ResponseTypeIsFileStream) {
+                        const string okResponseKey = "200";
+                        operation.Responses = operation.Responses ?? new Dictionary<string, Response>();
+                        if (operation.Responses.ContainsKey(okResponseKey)) {
+                            operation.Responses.Remove(okResponseKey);
+                        }
+                        operation.Responses.Add(okResponseKey, new Response {
+                            Description = "OK",
+                            Schema = new Schema {
+                                Type = "file"
+                            }
+                        });
+                    }
+                }
+            }
         }
     }
 }
