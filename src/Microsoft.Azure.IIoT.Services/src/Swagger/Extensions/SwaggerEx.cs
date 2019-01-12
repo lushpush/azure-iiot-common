@@ -9,6 +9,7 @@ namespace Swashbuckle.AspNetCore.Swagger {
     using Microsoft.AspNetCore.Builder;
     using Microsoft.AspNetCore.Mvc.Controllers;
     using Microsoft.Azure.IIoT.Auth.Clients;
+    using Microsoft.Azure.IIoT.Auth.Server;
     using Microsoft.Azure.IIoT.Http;
     using Microsoft.Azure.IIoT.Services.Swagger;
     using Microsoft.Extensions.DependencyInjection;
@@ -17,13 +18,12 @@ namespace Swashbuckle.AspNetCore.Swagger {
     using System.Collections.Generic;
     using System.IO;
     using System.Linq;
-    using Microsoft.Azure.IIoT.Auth.Server;
     using System.Reflection;
 
     /// <summary>
     /// Configure swagger
     /// </summary>
-    public static partial class SwaggerEx {
+    public static class SwaggerEx {
 
         /// <summary>
         /// Configure swagger
