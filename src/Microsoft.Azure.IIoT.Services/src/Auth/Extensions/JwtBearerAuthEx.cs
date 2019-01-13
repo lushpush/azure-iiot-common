@@ -29,7 +29,7 @@ namespace Microsoft.Azure.IIoT.Services.Auth {
         public static void AddJwtBearerAuthentication(this IServiceCollection services,
             IAuthConfig config, bool inDevelopment) {
 
-            if (Config.HttpsRedirectPort > 0) {
+            if (config.HttpsRedirectPort > 0) {
                 services.AddHsts(options => {
                     options.Preload = true;
                     options.IncludeSubDomains = true;
