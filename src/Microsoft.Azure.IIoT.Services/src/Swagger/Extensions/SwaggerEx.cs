@@ -148,7 +148,10 @@ namespace Swashbuckle.AspNetCore.Swagger {
                 if (typeInfo.IsEnum) {
                     schema.Extensions.Add(
                         "x-ms-enum",
-                        new { name = typeInfo.Name, modelAsString = true }
+                        new {
+                            name = typeInfo.Name,
+                            modelAsString = true
+                        }
                     );
                 }
             }
@@ -191,7 +194,7 @@ namespace Swashbuckle.AspNetCore.Swagger {
         }
 
         /// <summary>
-        /// Add autorest operation extensions 
+        /// Add autorest operation extensions
         /// </summary>
         private class AutoRestOperationExtensions : IOperationFilter {
 
