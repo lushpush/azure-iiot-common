@@ -76,8 +76,6 @@ namespace Swashbuckle.AspNetCore.Swagger {
                             Flow = "implicit",
                             AuthorizationUrl = resource.GetAuthorityUrl() +
                                 "/oauth2/authorize",
-                            //TokenUrl = resource.GetAuthorityUrl() +
-                            //    "/oauth2/token",
                             Scopes = services.GetRequiredScopes()
                                 .ToDictionary(k => k, k => $"Access {k} operations")
                         });
