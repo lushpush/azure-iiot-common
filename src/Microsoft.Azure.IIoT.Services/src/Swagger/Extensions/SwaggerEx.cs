@@ -56,7 +56,6 @@ namespace Swashbuckle.AspNetCore.Swagger {
 
                 // Add autorest extensions
                 options.SchemaFilter<AutoRestSchemaExtensions>();
-                options.OperationFilter<AutoRestOperationExtensions>();
 
                 // If auth enabled, need to have bearer token to access any api
                 if (config.WithAuth) {
@@ -68,21 +67,25 @@ namespace Swashbuckle.AspNetCore.Swagger {
                             Name = "Authorization",
                             In = "header"
                         });
+                        options.OperationFilter<AutoRestOperationExtensions>();
                     }
                     else {
-                        options.AddSecurityDefinition("oauth2_implicit", new OAuth2Scheme {
+                        options.AddSecurityDefinition("oauth2", new OAuth2Scheme {
                             Type = "oauth2",
                             Description = "Implicit oauth2 token flow.",
                             Flow = "implicit",
                             AuthorizationUrl = resource.GetAuthorityUrl() +
                                 "/oauth2/authorize",
+                            //TokenUrl = resource.GetAuthorityUrl() +
+                            //    "/oauth2/token",
                             Scopes = services.GetRequiredScopes()
-                                .ToDictionary(k => k, k => $"Access {k} operations") //,
-                            // TokenUrl = resource.GetAuthorityUrl() +
-                            //     "/oauth2/token"
+                                .ToDictionary(k => k, k => $"Access {k} operations")
                         });
                         options.OperationFilter<SecurityRequirementsOperationFilter>();
                     }
+                }
+                else {
+                    options.OperationFilter<AutoRestOperationExtensions>();
                 }
             });
         }
@@ -110,7 +113,10 @@ namespace Swashbuckle.AspNetCore.Swagger {
                             out var values) && values.Count > 0) {
                         doc.BasePath = "/" + values[0];
                     }
-                    doc.Schemes = new List<string> { "http", "https" };
+                    doc.Schemes = new List<string> { "https" };
+                    if (config.WithHttpScheme) {
+                        doc.Schemes.Add("http");
+                    }
                 });
                 options.RouteTemplate = "{documentName}/swagger.json";
             });
@@ -178,41 +184,6 @@ namespace Swashbuckle.AspNetCore.Swagger {
             }
         }
 
-        /// <summary>
-        /// Gather security operations
-        /// </summary>
-        private class SecurityRequirementsOperationFilter : IOperationFilter {
-
-            /// <summary>
-            /// Create filter using injected and configured authorization options
-            /// </summary>
-            /// <param name="options"></param>
-            public SecurityRequirementsOperationFilter(IOptions<AuthorizationOptions> options) {
-                _options = options;
-            }
-
-            /// <inheritdoc/>
-            public void Apply(Operation operation, OperationFilterContext context) {
-                var descriptor = context.ApiDescription.ActionDescriptor as
-                    ControllerActionDescriptor;
-                var claims = descriptor.GetRequiredPolicyGlaims(_options.Value);
-                if (claims.Any()) {
-                    operation.Responses.Add("401",
-                        new Response { Description = "Unauthorized" });
-                    operation.Responses.Add("403",
-                        new Response { Description = "Forbidden" });
-
-                    // Add security description
-                    operation.Security = new List<IDictionary<string, IEnumerable<string>>> {
-                        new Dictionary<string, IEnumerable<string>> {
-                            { "oauth2", claims }
-                        }
-                    };
-                }
-            }
-
-            private readonly IOptions<AuthorizationOptions> _options;
-        }
 
         /// <summary>
         /// Add autorest operation extensions
@@ -220,7 +191,7 @@ namespace Swashbuckle.AspNetCore.Swagger {
         private class AutoRestOperationExtensions : IOperationFilter {
 
             /// <inheritdoc/>
-            public void Apply(Operation operation, OperationFilterContext context) {
+            public virtual void Apply(Operation operation, OperationFilterContext context) {
                 var name = context.MethodInfo.Name;
                 if (name.EndsWith("Async", StringComparison.InvariantCultureIgnoreCase)) {
                     operation.OperationId = name.Substring(0, name.Length - 5);
@@ -255,5 +226,43 @@ namespace Swashbuckle.AspNetCore.Swagger {
                 }
             }
         }
+
+        /// <summary>
+        /// Gather security operations
+        /// </summary>
+        private class SecurityRequirementsOperationFilter : AutoRestOperationExtensions {
+
+            /// <summary>
+            /// Create filter using injected and configured authorization options
+            /// </summary>
+            /// <param name="options"></param>
+            public SecurityRequirementsOperationFilter(IOptions<AuthorizationOptions> options) {
+                _options = options;
+            }
+
+            /// <inheritdoc/>
+            public override void Apply(Operation operation, OperationFilterContext context) {
+                base.Apply(operation, context);
+                var descriptor = context.ApiDescription.ActionDescriptor as
+                    ControllerActionDescriptor;
+                var claims = descriptor.GetRequiredPolicyGlaims(_options.Value);
+                if (claims.Any()) {
+                    operation.Responses.Add("401",
+                        new Response { Description = "Unauthorized" });
+                    operation.Responses.Add("403",
+                        new Response { Description = "Forbidden" });
+
+                    // Add security description
+                    operation.Security = new List<IDictionary<string, IEnumerable<string>>> {
+                        new Dictionary<string, IEnumerable<string>> {
+                            { "oauth2", claims }
+                        }
+                    };
+                }
+            }
+
+            private readonly IOptions<AuthorizationOptions> _options;
+        }
     }
 }
+
