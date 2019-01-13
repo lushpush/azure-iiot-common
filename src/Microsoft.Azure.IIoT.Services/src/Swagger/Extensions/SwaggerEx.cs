@@ -19,6 +19,7 @@ namespace Swashbuckle.AspNetCore.Swagger {
     using System.IO;
     using System.Linq;
     using System.Reflection;
+    using System.Net;
 
     /// <summary>
     /// Configure swagger
@@ -137,22 +138,42 @@ namespace Swashbuckle.AspNetCore.Swagger {
         }
 
         /// <summary>
-        /// Apply extensions for autorest
+        /// Add extensions for autorest to schemas
         /// </summary>
-        private class AutoRestSchemaExtensions : ISchemaFilter {
+        private class AutoRestSchemaExtensions : ISchemaFilter, IParameterFilter {
 
             /// <inheritdoc/>
-            public void Apply(Schema schema, SchemaFilterContext context) {
-                var typeInfo = context.SystemType.GetTypeInfo();
+            public void Apply(Schema model, SchemaFilterContext context) =>
+                AddExtension(context.SystemType, model.Extensions);
 
-                if (typeInfo.IsEnum) {
-                    schema.Extensions.Add(
-                        "x-ms-enum",
-                        new {
-                            name = typeInfo.Name,
-                            modelAsString = true
-                        }
-                    );
+            /// <inheritdoc/>
+            public void Apply(IParameter parameter, ParameterFilterContext context) =>
+                AddExtension(context.ParameterInfo.ParameterType, parameter.Extensions);
+
+            /// <summary>
+            /// Add enum extension
+            /// </summary>
+            /// <param name="paramType"></param>
+            /// <param name="extensions"></param>
+            /// <returns></returns>
+            private static void AddExtension(Type paramType,
+                Dictionary<string, object> extensions) {
+                if (paramType.IsGenericType &&
+                    paramType.GetGenericTypeDefinition() == typeof(Nullable<>)) {
+                    // Most of the model enums are nullable
+                    paramType = paramType.GetGenericArguments()[0];
+                }
+                if (paramType.IsEnum) {
+                    extensions.Add("x-ms-enum", new {
+                        name = paramType.Name,
+                        modelAsString = false,
+                        values = paramType
+                            .GetFields(BindingFlags.Static | BindingFlags.Public)
+                            .Select(field => new {
+                                name = field.Name,
+                                value = field.Name,
+                            })
+                    });
                 }
             }
         }
@@ -200,9 +221,16 @@ namespace Swashbuckle.AspNetCore.Swagger {
 
             /// <inheritdoc/>
             public void Apply(Operation operation, OperationFilterContext context) {
-                var descriptor = context.ApiDescription.ActionDescriptor as
-                ControllerActionDescriptor;
-                var attribute = descriptor.MethodInfo.GetCustomAttributes<AutoRestExtensionAttribute>().FirstOrDefault();
+                var name = context.MethodInfo.Name;
+                if (name.EndsWith("Async", StringComparison.InvariantCultureIgnoreCase)) {
+                    operation.OperationId = name.Substring(0, name.Length - 5);
+                }
+                if (operation.OperationId.Contains("CreateOrUpdate") &&
+                    context.ApiDescription.HttpMethod.EqualsIgnoreCase("PATCH")) {
+                    operation.OperationId = operation.OperationId.Replace("CreateOrUpdate", "Update");
+                }
+                var attribute = context.MethodInfo
+                    .GetCustomAttributes<AutoRestExtensionAttribute>().FirstOrDefault();
                 if (attribute != null) {
                     if (attribute.LongRunning) {
                         operation.Extensions.Add("x-ms-long-running-operation", true);
@@ -214,17 +242,15 @@ namespace Swashbuckle.AspNetCore.Swagger {
                             });
                     }
                     if (attribute.ResponseTypeIsFileStream) {
-                        const string okResponseKey = "200";
-                        operation.Responses = operation.Responses ?? new Dictionary<string, Response>();
-                        if (operation.Responses.ContainsKey(okResponseKey)) {
-                            operation.Responses.Remove(okResponseKey);
-                        }
-                        operation.Responses.Add(okResponseKey, new Response {
-                            Description = "OK",
-                            Schema = new Schema {
-                                Type = "file"
-                            }
-                        });
+                        operation.Responses = operation.Responses ??
+                            new Dictionary<string, Response>();
+                        operation.Responses.AddOrUpdate(HttpStatusCode.OK.ToString(),
+                            new Response {
+                                Description = "OK",
+                                Schema = new Schema {
+                                    Type = "file"
+                                }
+                            });
                     }
                 }
             }
