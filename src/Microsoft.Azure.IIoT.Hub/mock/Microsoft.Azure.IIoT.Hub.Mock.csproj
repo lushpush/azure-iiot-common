@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
@@ -7,7 +7,7 @@
     <Antlr4UseCSharpGenerator>True</Antlr4UseCSharpGenerator>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Antlr4" Version="4.6.5" />
+    <PackageReference Include="Antlr4" Version="4.6.6" />
   </ItemGroup>
   <ItemGroup>
     <Antlr4 Update="**/*.g4">
