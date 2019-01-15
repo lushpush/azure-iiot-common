@@ -202,6 +202,9 @@ namespace Microsoft.Azure.IIoT.Storage {
                     throw new ResourceTooLargeException(newDoc.ToString(), size, kMaxDocSize);
                 }
                 _data.Add(newDoc.Id, newDoc);
+#if LOG_VERBOSE
+                _logger.Info($"{newDoc}");
+#endif
             }
 
             /// <summary>
