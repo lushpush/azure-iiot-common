@@ -10,7 +10,7 @@ namespace Microsoft.Azure.IIoT.Diagnostics {
     /// <summary>
     /// Writes audit log entries to logger
     /// </summary>
-    public class AuditLogLogger : IAuditLogWriter, IAuditLog {
+    public sealed class AuditLogLogger : IAuditLogWriter, IAuditLog {
 
         /// <summary>
         /// Create audit logger adapter

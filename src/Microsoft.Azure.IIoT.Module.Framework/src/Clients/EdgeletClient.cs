@@ -20,7 +20,7 @@ namespace Microsoft.Azure.IIoT.Module.Framework.Hosting {
     /// <summary>
     /// Edgelet client providing discovery and in the future other services
     /// </summary>
-    public class EdgeletClient : IModuleDiscovery, ISecureElement {
+    public sealed class EdgeletClient : IModuleDiscovery, ISecureElement {
 
         /// <summary>
         /// Create client

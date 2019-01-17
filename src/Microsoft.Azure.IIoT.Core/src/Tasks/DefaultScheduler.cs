@@ -11,7 +11,7 @@ namespace Microsoft.Azure.IIoT.Tasks.Default {
     /// <summary>
     /// Default task scheduler
     /// </summary>
-    public class DefaultScheduler : ITaskScheduler {
+    public sealed class DefaultScheduler : ITaskScheduler {
 
         /// <inheritdoc/>
         public TaskFactory Factory => Task.Factory;

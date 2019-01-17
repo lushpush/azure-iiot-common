@@ -13,12 +13,11 @@ namespace Microsoft.Azure.IIoT.Module.Default {
     using System.Threading;
     using System.Threading.Tasks;
     using System.Net;
-    using Newtonsoft.Json.Linq;
 
     /// <summary>
     /// Chunked method provide reliable any size send/receive
     /// </summary>
-    public class ChunkMethodServer : IChunkMethodServer {
+    public sealed class ChunkMethodServer : IChunkMethodServer {
 
         /// <summary>
         /// Create server

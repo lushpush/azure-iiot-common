@@ -4,23 +4,27 @@
 // ------------------------------------------------------------
 
 namespace Microsoft.Azure.IIoT.Storage {
+    using System;
     using System.Collections.Generic;
+    using System.Threading;
+    using System.Threading.Tasks;
 
     /// <summary>
-    /// Provides sql query capability
+    /// List of documents
     /// </summary>
-    public interface ISqlQueryable {
+    public interface IResultFeed<T> : IDisposable {
 
         /// <summary>
-        /// Query items
+        /// Returns whether there is more data in the feed
         /// </summary>
-        /// <param name="queryString"></param>
-        /// <param name="parameters"></param>
-        /// <param name="pageSize"></param>
-        /// <param name="partitionKey"></param>
         /// <returns></returns>
-        IDocumentFeed<IDocument<T>> Query<T>(string queryString,
-            IDictionary<string, object> parameters = null,
-            int? pageSize = null, string partitionKey = null);
+        bool HasMore();
+
+        /// <summary>
+        /// Read results from feed
+        /// </summary>
+        /// <returns></returns>
+        Task<IEnumerable<T>> ReadAsync(
+            CancellationToken ct = default(CancellationToken));
     }
 }

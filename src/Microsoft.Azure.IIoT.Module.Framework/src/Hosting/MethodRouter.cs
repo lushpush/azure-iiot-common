@@ -25,7 +25,7 @@ namespace Microsoft.Azure.IIoT.Module.Framework.Hosting {
     /// <summary>
     /// Provides request routing to module controllers
     /// </summary>
-    public class MethodRouter : IMethodRouter, IMethodHandler {
+    public sealed class MethodRouter : IMethodRouter, IMethodHandler {
 
         /// <summary>
         /// Property Di to prevent circular dependency between host and controller

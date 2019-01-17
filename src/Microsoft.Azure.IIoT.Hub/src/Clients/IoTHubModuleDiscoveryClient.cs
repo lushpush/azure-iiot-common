@@ -19,7 +19,7 @@ namespace Microsoft.Azure.IIoT.Hub.Clients {
     /// <summary>
     /// Module discovery client using twin services
     /// </summary>
-    public class IoTHubModuleDiscoveryClient : IModuleDiscovery {
+    public sealed class IoTHubModuleDiscoveryClient : IModuleDiscovery {
 
         /// <summary>
         /// Create client

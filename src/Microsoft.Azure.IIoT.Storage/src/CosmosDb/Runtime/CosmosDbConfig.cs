@@ -3,8 +3,8 @@
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-namespace Microsoft.Azure.IIoT.Storage.Azure.Runtime {
-    using Microsoft.Azure.IIoT.Storage.Azure;
+namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Runtime {
+    using Microsoft.Azure.IIoT.Storage.CosmosDb;
     using Microsoft.Azure.IIoT.Utils;
     using Microsoft.Extensions.Configuration;
 

@@ -10,7 +10,7 @@ namespace Microsoft.Azure.IIoT.Diagnostics {
     /// <summary>
     /// Simple CLI console logger which does not log any context.
     /// </summary>
-    public class SimpleLogger : ConsoleLogger {
+    public sealed class SimpleLogger : ConsoleLogger {
 
         /// <inheritdoc/>
         protected override void WriteLine(string preamble, string message,

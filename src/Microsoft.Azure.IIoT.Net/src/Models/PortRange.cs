@@ -12,7 +12,7 @@ namespace Microsoft.Azure.IIoT.Net.Models {
     /// <summary>
     /// A port range
     /// </summary>
-    public class PortRange {
+    public sealed class PortRange {
 
         /// <summary>
         /// Number of ports in range

@@ -15,7 +15,7 @@ namespace Microsoft.Azure.IIoT.Tasks.Default {
     /// Provides a task scheduler that ensures a maximum concurrency level
     /// while running on top of the ThreadPool.
     /// </summary>
-    public class LimitingScheduler : ITaskScheduler {
+    public sealed class LimitingScheduler : ITaskScheduler {
 
         /// <inheritdoc/>
         public TaskFactory Factory => _factory;

@@ -3,7 +3,7 @@
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
+namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
     using Microsoft.Azure.IIoT.Diagnostics;
     using Microsoft.Azure.IIoT.Utils;
     using Microsoft.Azure.IIoT.Exceptions;
@@ -19,16 +19,18 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
     using System.Threading;
     using System.Threading.Tasks;
     using Newtonsoft.Json.Linq;
+    using GremlinClient = Gremlin.Net.Driver.GremlinClient;
+    using GremlinServer = Gremlin.Net.Driver.GremlinServer;
 
     /// <summary>
     /// Collection abstraction
     /// </summary>
-    internal class CosmosDbCollection : IDocumentCollection, ISqlQueryable {
+    sealed class DatabaseCollection : IDocumentCollection, ISqlQueryClient, IGraph {
 
         /// <summary>
-        /// Returns collection
+        /// Wrapped document collection instance
         /// </summary>
-        internal DocumentCollection Collection { get; private set; }
+        internal DocumentCollection Collection { get; }
 
         /// <summary>
         /// Create collection
@@ -37,7 +39,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         /// <param name="collection"></param>
         /// <param name="partitioned"></param>
         /// <param name="logger"></param>
-        internal CosmosDbCollection(CosmosDbDatabase db, DocumentCollection collection,
+        internal DatabaseCollection(DatabaseStore db, DocumentCollection collection,
             bool partitioned, ILogger logger) {
             _logger = logger;
             _partitioned = partitioned;
@@ -46,7 +48,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         /// <inheritdoc/>
-        public IDocumentFeed<R> Query<T, R>(Func<IQueryable<IDocument<T>>,
+        public IResultFeed<R> Query<T, R>(Func<IQueryable<IDocument<T>>,
             IQueryable<R>> query, int? pageSize, string partitionKey) {
             if (query == null) {
                 throw new ArgumentNullException(nameof(query));
@@ -60,12 +62,20 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
                        MaxItemCount = pageSize ?? - 1,
                        PartitionKey = pk,
                        EnableCrossPartitionQuery = pk == null
-                   }).Select(d => (IDocument<T>)new CosmosDbDocument<T>(d)));
-            return new CosmosDbFeed<R>(result.AsDocumentQuery(), _logger);
+                   }).Select(d => (IDocument<T>)new DocumentWrapper<T>(d)));
+            return new DocumentFeed<R>(result.AsDocumentQuery(), _logger);
         }
 
         /// <inheritdoc/>
-        public IDocumentFeed<IDocument<T>> Query<T>(string queryString,
+        public IGremlinClient OpenGremlinClient() {
+            throw new NotImplementedException();
+        }
+
+        /// <inheritdoc/>
+        public ISqlQueryClient OpenSqlQueryClient() => this;
+
+        /// <inheritdoc/>
+        public IResultFeed<IDocument<T>> Query<T>(string queryString,
             IDictionary<string, object> parameters, int? pageSize, string partitionKey) {
             if (string.IsNullOrEmpty(queryString)) {
                 throw new ArgumentNullException(nameof(queryString));
@@ -85,8 +95,8 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
                     MaxItemCount = pageSize ?? -1,
                     PartitionKey = pk,
                     EnableCrossPartitionQuery = pk == null
-                }).Select(d => (IDocument<T>)new CosmosDbDocument<T>(d));
-            return new CosmosDbFeed<IDocument<T>>(query.AsDocumentQuery(), _logger);
+                }).Select(d => (IDocument<T>)new DocumentWrapper<T>(d));
+            return new DocumentFeed<IDocument<T>>(query.AsDocumentQuery(), _logger);
         }
 
         /// <inheritdoc/>
@@ -100,7 +110,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
             try {
                 return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                     try {
-                        return new CosmosDbDocument<T>(await _db.Client.ReadDocumentAsync(
+                        return new DocumentWrapper<T>(await _db.Client.ReadDocumentAsync(
                             UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, id),
                             new RequestOptions { PartitionKey = pk }, ct));
 
@@ -127,7 +137,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
                 new PartitionKey(partitionKey);
             return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                 try {
-                    return new CosmosDbDocument<T>(await _db.Client.UpsertDocumentAsync(
+                    return new DocumentWrapper<T>(await _db.Client.UpsertDocumentAsync(
                         UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
                         GetItem(id, newItem, partitionKey),
                         new RequestOptions { AccessCondition = ac, PartitionKey = pk },
@@ -154,7 +164,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
                 new PartitionKey(existing.PartitionKey);
             return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                 try {
-                    return new CosmosDbDocument<T>(await _db.Client.ReplaceDocumentAsync(
+                    return new DocumentWrapper<T>(await _db.Client.ReplaceDocumentAsync(
                         UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, existing.Id),
                         GetItem(existing.Id, newItem, existing.PartitionKey),
                         new RequestOptions { AccessCondition = ac, PartitionKey = pk }, ct));
@@ -173,7 +183,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
                 new PartitionKey(partitionKey);
             return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                 try {
-                    return new CosmosDbDocument<T>(await _db.Client.CreateDocumentAsync(
+                    return new DocumentWrapper<T>(await _db.Client.CreateDocumentAsync(
                         UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
                         GetItem(id, newItem, partitionKey), new RequestOptions { PartitionKey = pk },
                         false, ct));
@@ -254,10 +264,35 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
             return token;
         }
 
+        /// <summary>
+        /// Gremlin client
+        /// </summary>
+        internal class GremlinClientWrapper : IGremlinClient {
+
+            /// <summary>
+            /// Create wrapper
+            /// </summary>
+            /// <param name="server"></param>
+            public GremlinClientWrapper(GremlinServer server) {
+                _wrapped = new GremlinClient(server, null, null, null);
+            }
+
+            /// <inheritdoc/>
+            public void Dispose() => _wrapped.Dispose();
+
+            /// <inheritdoc/>
+            public IResultFeed<IDocument<T>> Submit<T>(string gremlin,
+                int? pageSize = null, string partitionKey = null) {
+                throw new NotImplementedException();
+            }
+
+            private readonly GremlinClient _wrapped;
+        }
+
         internal const string kIdProperty = "id";
         internal const string kPartitionKeyProperty = "__pk";
 
-        private readonly CosmosDbDatabase _db;
+        private readonly DatabaseStore _db;
         private readonly ILogger _logger;
         private readonly bool _partitioned;
     }

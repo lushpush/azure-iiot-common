@@ -17,7 +17,7 @@ namespace Microsoft.Azure.IIoT.Hub.Clients {
     /// Messaging service client - injects messages on behalf of
     /// a device or module.
     /// </summary>
-    public class IoTHubMessagingHttpClient : IoTHubHttpClientBase,
+    public sealed class IoTHubMessagingHttpClient : IoTHubHttpClientBase,
         IIoTHubMessagingServices {
 
         /// <summary>

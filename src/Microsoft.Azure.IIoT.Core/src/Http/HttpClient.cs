@@ -17,7 +17,7 @@ namespace Microsoft.Azure.IIoT.Http.Default {
     /// abstracting away all the http client factory and handler noise
     /// for easy injection.
     /// </summary>
-    public class HttpClient : IHttpClient {
+    public sealed class HttpClient : IHttpClient {
 
         /// <summary>
         /// Create client
@@ -136,7 +136,7 @@ namespace Microsoft.Azure.IIoT.Http.Default {
         /// <summary>
         /// Request object
         /// </summary>
-        public class HttpRequest : IHttpRequest {
+        public sealed class HttpRequest : IHttpRequest {
 
             /// <summary>
             /// Constructor
@@ -182,7 +182,7 @@ namespace Microsoft.Azure.IIoT.Http.Default {
         /// <summary>
         /// Response object
         /// </summary>
-        public class HttpResponse : IHttpResponse {
+        public sealed class HttpResponse : IHttpResponse {
 
             /// <inheritdoc/>
             public string ResourceId { get; internal set; }

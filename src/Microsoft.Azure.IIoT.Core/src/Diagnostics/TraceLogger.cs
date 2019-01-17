@@ -11,7 +11,7 @@ namespace Microsoft.Azure.IIoT.Diagnostics {
     /// <summary>
     /// Simple trace Logger implementation
     /// </summary>
-    public class TraceLogger : ILogger {
+    public sealed class TraceLogger : ILogger {
 
         /// <inheritdoc/>
         public string Name { get; }

@@ -17,7 +17,7 @@ namespace Microsoft.Azure.IIoT.Net.Scanner {
     /// <summary>
     /// Scans port ranges
     /// </summary>
-    public class PortScanner : IScanner {
+    public sealed class PortScanner : IScanner {
 
         /// <summary>
         /// Number of items scanned

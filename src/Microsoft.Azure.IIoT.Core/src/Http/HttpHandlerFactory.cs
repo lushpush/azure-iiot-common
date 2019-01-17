@@ -15,7 +15,7 @@ namespace Microsoft.Azure.IIoT.Http.Default {
     /// <summary>
     /// Wraps http handles in a delegating handler
     /// </summary>
-    public class HttpHandlerFactory : IHttpHandlerFactory {
+    public sealed class HttpHandlerFactory : IHttpHandlerFactory {
 
         /// <summary>Constant to use as default resource id</summary>
         public static readonly string kDefaultResourceId = "$default$";

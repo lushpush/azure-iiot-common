@@ -16,7 +16,7 @@ namespace Microsoft.Azure.IIoT.Net.Scanner {
     /// <summary>
     /// Scans network using icmp and finds all machines in it.
     /// </summary>
-    public class NetworkScanner : IScanner {
+    public sealed class NetworkScanner : IScanner {
 
         /// <summary>
         /// Number of items scanned

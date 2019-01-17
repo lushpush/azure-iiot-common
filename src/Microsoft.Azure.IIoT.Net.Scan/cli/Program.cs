@@ -35,7 +35,10 @@ namespace Microsoft.Azure.IIoT.Net.Cli {
             var op = Op.None;
             var host = Dns.GetHostName();
 
-            var configuration = new ConfigurationBuilder().AddEnvironmentVariables().Build();
+            var configuration = new ConfigurationBuilder()
+                .AddFromDotEnvFile()
+                .AddEnvironmentVariables()
+                .Build();
             try {
                 for (var i = 0; i < args.Length; i++) {
                     switch (args[i]) {

@@ -18,7 +18,7 @@ namespace Microsoft.Azure.IIoT.Module.Framework.Hosting {
     /// <summary>
     /// Provides set/get routing to controllers
     /// </summary>
-    public class SettingsRouter : ISettingsRouter {
+    public sealed class SettingsRouter : ISettingsRouter {
 
         /// <summary>
         /// Property Di to prevent circular dependency between host and controller

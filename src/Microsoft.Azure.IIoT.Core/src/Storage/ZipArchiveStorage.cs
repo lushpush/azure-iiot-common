@@ -12,7 +12,7 @@ namespace Microsoft.Azure.IIoT.Storage {
     /// <summary>
     /// Represents a way to create or open zip archives.
     /// </summary>
-    public class ZipArchiveStorage : IArchiveStorage {
+    public sealed class ZipArchiveStorage : IArchiveStorage {
 
         /// <inheritdoc/>
         public Task<IArchive> OpenAsync(string path, FileMode mode,

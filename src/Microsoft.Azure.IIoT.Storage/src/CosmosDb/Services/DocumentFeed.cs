@@ -3,7 +3,7 @@
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
+namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
     using Microsoft.Azure.IIoT.Diagnostics;
     using Microsoft.Azure.IIoT.Utils;
     using Microsoft.Azure.Documents.Linq;
@@ -16,12 +16,12 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
     /// <summary>
     /// Wraps a document query to return statements
     /// </summary>
-    internal class CosmosDbFeed<T> : IDocumentFeed<T> {
+    internal class DocumentFeed<T> : IResultFeed<T> {
 
         /// <summary>
         /// Create feed
         /// </summary>
-        internal CosmosDbFeed(IDocumentQuery<T> query, ILogger logger) {
+        internal DocumentFeed(IDocumentQuery<T> query, ILogger logger) {
             _query = query;
             _logger = logger;
         }
@@ -34,7 +34,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
                         return await _query.ExecuteNextAsync<T>(ct);
                     }
                     catch (Exception ex) {
-                        CosmosDbCollection.FilterException(ex);
+                        DatabaseCollection.FilterException(ex);
                     }
                 }
                 return Enumerable.Empty<T>();
@@ -47,9 +47,7 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         /// <summary>
         /// Dispose query
         /// </summary>
-        public void Dispose() {
-            _query.Dispose();
-        }
+        public void Dispose() => _query.Dispose();
 
         private readonly IDocumentQuery<T> _query;
         private readonly ILogger _logger;

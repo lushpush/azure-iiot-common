@@ -18,7 +18,7 @@ namespace Microsoft.Azure.IIoT.Module.Default {
     /// <summary>
     /// Chunked method provide reliable any size send/receive
     /// </summary>
-    public class ChunkMethodClient : IMethodClient {
+    public sealed class ChunkMethodClient : IMethodClient {
 
         /// <summary>
         /// Create client wrapping a json method client

@@ -3,16 +3,19 @@
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-namespace Microsoft.Azure.IIoT.Storage.Azure {
+namespace Microsoft.Azure.IIoT.Storage {
+    using System.Threading.Tasks;
 
     /// <summary>
-    /// Configuration for cosmos db
+    /// Document database service
     /// </summary>
-    public interface ICosmosDbConfig {
+    public interface IDatabaseServer {
 
         /// <summary>
-        /// Connection string to use (mandatory)
+        /// Opens a named or default database
         /// </summary>
-        string DbConnectionString { get; }
+        /// <param name="id"></param>
+        /// <returns></returns>
+        Task<IDatabase> OpenAsync(string id = null);
     }
 }

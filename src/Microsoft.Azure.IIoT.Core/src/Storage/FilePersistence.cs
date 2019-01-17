@@ -16,7 +16,7 @@ namespace Microsoft.Azure.IIoT.Storage.Default {
     /// <summary>
     /// Persists into a file
     /// </summary>
-    public class FilePersistance : IPersistenceProvider, IDisposable {
+    public sealed class FilePersistance : IPersistenceProvider, IDisposable {
 
         /// <summary>
         /// Create file persistence provider

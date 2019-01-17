@@ -15,7 +15,7 @@ namespace Microsoft.Azure.IIoT.Module.Framework {
     /// <summary>
     /// Injected module framework module
     /// </summary>
-    public class ModuleFramework : Module {
+    public sealed class ModuleFramework : Module {
 
         /// <summary>
         /// Load the module

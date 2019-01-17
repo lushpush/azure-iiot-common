@@ -16,7 +16,7 @@ namespace Microsoft.Azure.IIoT.Tasks.Default {
     /// A task (or job) processor build on top of an in memory
     /// BlockingCollection
     /// </summary>
-    public class TaskProcessor : ITaskProcessor, IDisposable {
+    public sealed class TaskProcessor : ITaskProcessor, IDisposable {
 
         /// <summary>
         /// The processors task scheduler
@@ -81,7 +81,7 @@ namespace Microsoft.Azure.IIoT.Tasks.Default {
         public void Dispose() => Try.Op(() =>
             Task.WaitAll(_processors.Select(p => p.CloseAsync()).ToArray()));
 
-        private class ProcessorWorker {
+        sealed class ProcessorWorker {
 
             internal BlockingCollection<Work> Queue { get; }
 
@@ -137,7 +137,7 @@ namespace Microsoft.Azure.IIoT.Tasks.Default {
                 }
             }
 
-            internal class Work {
+            internal sealed class Work {
 
                 /// <summary>
                 /// Number of retries
@@ -159,7 +159,7 @@ namespace Microsoft.Azure.IIoT.Tasks.Default {
             private readonly Task _worker;
         }
 
-        internal class DefaultConfig : ITaskProcessorConfig {
+        internal sealed class DefaultConfig : ITaskProcessorConfig {
             public int MaxInstances => 1;
             public int MaxQueueSize => 1000;
         }

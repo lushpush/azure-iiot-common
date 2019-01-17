@@ -13,7 +13,7 @@ namespace Microsoft.Azure.IIoT.Net.Ssh {
     /// <summary>
     /// Secure shell factory
     /// </summary>
-    public class SshShellFactory : IShellFactory {
+    public sealed class SshShellFactory : IShellFactory {
 
         /// <summary>
         /// Create factory

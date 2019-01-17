@@ -5,11 +5,13 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>Azure Industrial IoT Core Azure Storage Implementations</Description>
+    <VersionSuffix>prerelease001</VersionSuffix>
+    <NoWarn>NU1608;NU5125</NoWarn>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Gremlin.Net" Version="3.4.0" />
     <PackageReference Include="Microsoft.Azure.DocumentDB.Core" Version="2.2.1" />
-    <PackageReference Include="Microsoft.Azure.KeyVault" Version="3.0.2" />
-    <PackageReference Include="Microsoft.Azure.Services.AppAuthentication" Version="1.0.3" />
+    <PackageReference Include="Microsoft.Azure.CosmosDB.BulkExecutor" Version="2.1.0-preview2" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Microsoft.Azure.IIoT.Core\src\Microsoft.Azure.IIoT.Core.csproj" />

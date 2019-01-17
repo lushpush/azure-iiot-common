@@ -12,7 +12,7 @@ namespace System.Collections.Concurrent {
     /// Based on ParallelExtensions sample implementation.
     /// </summary>
     [DebuggerDisplay("Count={Count}")]
-    public class PriorityQueue<T, V> : IProducerConsumerCollection<ValueTuple<T, V>>
+    public sealed class PriorityQueue<T, V> : IProducerConsumerCollection<ValueTuple<T, V>>
         where T : IComparable<T> {
 
         /// <inheritdoc/>

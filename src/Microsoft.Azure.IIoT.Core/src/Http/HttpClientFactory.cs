@@ -15,7 +15,7 @@ namespace Microsoft.Azure.IIoT.Http.Default {
     /// of the the one implemented in asp.net core and uses a handler builder
     /// instead of the asp.net builder.
     /// </summary>
-    public class HttpClientFactory : IHttpClientFactory {
+    public sealed class HttpClientFactory : IHttpClientFactory {
 
         /// <summary>
         /// Create factory

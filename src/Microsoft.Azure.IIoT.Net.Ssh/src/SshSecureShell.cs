@@ -15,7 +15,7 @@ namespace Microsoft.Azure.IIoT.Net.Ssh {
     /// <summary>
     /// Secure shell implementation
     /// </summary>
-    public class SshSecureShell : ISecureShell {
+    public sealed class SshSecureShell : ISecureShell {
 
         /// <summary>
         /// Creates SSHShell.

@@ -10,7 +10,7 @@ namespace Newtonsoft.Json {
     /// <summary>
     /// Writes address as json
     /// </summary>
-    internal class PhysicalAddressConverter : JsonConverter<PhysicalAddress> {
+    sealed class PhysicalAddressConverter : JsonConverter<PhysicalAddress> {
 
         /// <summary>
         /// Read

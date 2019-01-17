@@ -1,4 +1,4 @@
-﻿// ------------------------------------------------------------
+// ------------------------------------------------------------
 //  Copyright (c) Microsoft Corporation.  All rights reserved.
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
@@ -11,7 +11,7 @@ namespace Microsoft.Azure.IIoT.Http.Ssl {
     using System.Security.Cryptography.X509Certificates;
 
     /// <summary>
-    /// Validates using pinned certificate 
+    /// Validates using pinned certificate
     /// </summary>
     public class ThumbprintValidator : NoOpCertValidator {
 
@@ -20,7 +20,7 @@ namespace Microsoft.Azure.IIoT.Http.Ssl {
         /// </summary>
         /// <param name="config"></param>
         /// <param name="logger"></param>
-        public ThumbprintValidator(IThumbprintValidatorConfig config, 
+        public ThumbprintValidator(IThumbprintValidatorConfig config,
             ILogger logger) : this (config?.CertThumbprint, logger) {
         }
 
@@ -35,7 +35,7 @@ namespace Microsoft.Azure.IIoT.Http.Ssl {
         }
 
         /// <inheritdoc/>
-        public override bool Validate(HttpRequestHeaders headers, 
+        public override bool Validate(HttpRequestHeaders headers,
             X509Certificate2 cert, X509Chain chain, SslPolicyErrors? errors) {
             var sslThumbprint = cert.Thumbprint.ToLowerInvariant();
             if (sslThumbprint != _thumbprint) {

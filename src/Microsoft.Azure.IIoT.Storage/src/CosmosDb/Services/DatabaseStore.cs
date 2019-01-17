@@ -3,10 +3,12 @@
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
+namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
+    using Microsoft.Azure.IIoT.Diagnostics;
     using Microsoft.Azure.Documents.Client;
     using Microsoft.Azure.Documents;
     using System;
+    using System.Text;
     using System.Net;
     using System.IO;
     using System.Linq;
@@ -14,13 +16,11 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
     using System.Threading;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
-    using Microsoft.Azure.IIoT.Diagnostics;
-    using System.Text;
 
     /// <summary>
     /// Provides document db database interface.
     /// </summary>
-    internal class CosmosDbDatabase : IDocumentDatabase {
+    sealed class DatabaseStore : IDatabase {
 
         /// <summary>
         /// Database id
@@ -38,26 +38,20 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         /// <param name="client"></param>
         /// <param name="id"></param>
         /// <param name="logger"></param>
-        public CosmosDbDatabase(DocumentClient client, string id, ILogger logger) {
+        public DatabaseStore(DocumentClient client, string id, ILogger logger) {
             _logger = logger;
             Client = client;
-            _collections = new ConcurrentDictionary<string, CosmosDbCollection>();
             DatabaseId = id;
+            _collections = new ConcurrentDictionary<string, DatabaseCollection>();
         }
 
         /// <inheritdoc/>
-        public async Task<IDocumentCollection> OpenCollectionAsync(string id,
-            bool partitioned) {
-            if (string.IsNullOrEmpty(id)) {
-                id = "default";
-            }
-            if (!_collections.TryGetValue(id, out var collection)) {
-                var coll = await EnsureCollectionExists(id, partitioned);
-                collection = _collections.GetOrAdd(id, k =>
-                    new CosmosDbCollection(this, coll, partitioned, _logger));
-            }
-            return collection;
-        }
+        public async Task<IDocumentCollection> OpenDocumentCollectionAsync(string id,
+            bool partitioned) => await OpenOrCreateCollectionAsync(id, partitioned);
+
+        /// <inheritdoc/>
+        public async Task<IGraph> OpenGraphCollectionAsync(string id,
+            bool partitioned) => await OpenOrCreateCollectionAsync(id, partitioned);
 
         /// <inheritdoc/>
         public async Task<IEnumerable<string>> ListCollectionsAsync(CancellationToken ct) {
@@ -93,20 +87,39 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         /// <summary>
+        /// Create or Open collection
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="partitioned"></param>
+        /// <returns></returns>
+        private async Task<DatabaseCollection> OpenOrCreateCollectionAsync(
+            string id, bool partitioned) {
+            if (string.IsNullOrEmpty(id)) {
+                id = "default";
+            }
+            if (!_collections.TryGetValue(id, out var collection)) {
+                var coll = await EnsureCollectionExists(id, partitioned);
+                collection = _collections.GetOrAdd(id, k =>
+                    new DatabaseCollection(this, coll, partitioned, _logger));
+            }
+            return collection;
+        }
+
+        /// <summary>
         /// Ensures collection exists
         /// </summary>
         /// <param name="id"></param>
         /// <param name="partitioned"></param>
         /// <returns></returns>
-        private async Task<DocumentCollection> EnsureCollectionExists(string id,
+        private async Task<Documents.DocumentCollection> EnsureCollectionExists(string id,
             bool partitioned) {
             var database = await Client.CreateDatabaseIfNotExistsAsync(
-                new Database {
+                new Documents.Database {
                     Id = DatabaseId
                 }
             );
 
-            var collectionDefinition = new DocumentCollection {
+            var collectionDefinition = new Documents.DocumentCollection {
                 Id = id,
                 DefaultTimeToLive = -1, // Infinite
                 IndexingPolicy = new IndexingPolicy(new RangeIndex(DataType.String) {
@@ -115,8 +128,8 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
             };
 
             if (partitioned) {
-                collectionDefinition.PartitionKey.Paths.Add("/" +
-                    CosmosDbCollection.kPartitionKeyProperty);
+                collectionDefinition.PartitionKey.Paths.Add(
+                    "/" + DatabaseCollection.kPartitionKeyProperty);
             }
 
             var throughput = 10000;
@@ -176,6 +189,6 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
         }
 
         private readonly ILogger _logger;
-        private readonly ConcurrentDictionary<string, CosmosDbCollection> _collections;
+        private readonly ConcurrentDictionary<string, DatabaseCollection> _collections;
     }
 }

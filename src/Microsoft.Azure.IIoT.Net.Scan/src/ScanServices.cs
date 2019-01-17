@@ -16,7 +16,7 @@ namespace Microsoft.Azure.IIoT.Net.Scanner {
     /// <summary>
     /// Scanner services
     /// </summary>
-    public class ScanServices : IScanServices {
+    public sealed class ScanServices : IScanServices {
 
         /// <summary>
         /// Create scanner

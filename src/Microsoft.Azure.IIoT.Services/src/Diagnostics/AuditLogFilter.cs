@@ -16,7 +16,7 @@ namespace Microsoft.Azure.IIoT.Services.Diagnostics {
     /// <summary>
     /// Create audit log entries for every action invocation
     /// </summary>
-    public class AuditLogFilter : IAsyncActionFilter {
+    public sealed class AuditLogFilter : IAsyncActionFilter {
 
         /// <summary>
         /// Create filter

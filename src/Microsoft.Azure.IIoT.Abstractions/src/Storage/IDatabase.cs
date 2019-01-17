@@ -9,21 +9,32 @@ namespace Microsoft.Azure.IIoT.Storage {
     using System.Threading.Tasks;
 
     /// <summary>
-    /// Represents a document database
+    /// Represents a database
     /// </summary>
-    public interface IDocumentDatabase {
+    public interface IDatabase {
 
         /// <summary>
-        /// Opens or creates a collection.
+        /// Opens or creates a (default) collection as a
+        /// collection of document elements.
         /// </summary>
         /// <param name="id"></param>
         /// <param name="partitioned"></param>
         /// <returns></returns>
-        Task<IDocumentCollection> OpenCollectionAsync(
+        Task<IDocumentCollection> OpenDocumentCollectionAsync(
             string id = null, bool partitioned = false);
 
         /// <summary>
-        /// List all stores in the database
+        /// Opens or creates a (default) collection as a
+        /// collection of graph elements.
+        /// </summary>
+        /// <param name="id"></param>
+        /// <param name="partitioned"></param>
+        /// <returns></returns>
+        Task<IGraph> OpenGraphCollectionAsync(
+            string id = null, bool partitioned = false);
+
+        /// <summary>
+        /// List all collections in the database
         /// </summary>
         /// <param name="ct"></param>
         /// <returns></returns>
@@ -31,7 +42,7 @@ namespace Microsoft.Azure.IIoT.Storage {
             CancellationToken ct = default(CancellationToken));
 
         /// <summary>
-        /// Delete collection
+        /// Delete (default) collection in database
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>

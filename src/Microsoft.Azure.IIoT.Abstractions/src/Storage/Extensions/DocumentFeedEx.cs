@@ -4,31 +4,30 @@
 // ------------------------------------------------------------
 
 namespace Microsoft.Azure.IIoT.Storage {
-    using System;
+    using System.Collections.Generic;
     using System.Threading;
     using System.Threading.Tasks;
 
     /// <summary>
-    /// List of documents
+    /// Feed extensions
     /// </summary>
     public static class DocumentFeedEx {
 
         /// <summary>
-        /// Invoke callback for each element
+        /// Read all results from feed
         /// </summary>
+        /// <typeparam name="T"></typeparam>
         /// <param name="feed"></param>
-        /// <param name="callback"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        public static async Task ForEachAsync<T>(this IResultFeed<T> feed,
-            Func<T, Task> callback,
+        public static async Task<IEnumerable<T>> AllAsync<T>(this IResultFeed<T> feed,
             CancellationToken ct = default(CancellationToken)) {
+            var results = new List<T>();
             while (feed.HasMore()) {
-                var results = await feed.ReadAsync(ct);
-                foreach (var item in results) {
-                    await callback(item);
-                }
+                var result = await feed.ReadAsync(ct);
+                results.AddRange(result);
             }
+            return results;
         }
     }
 }

@@ -13,7 +13,7 @@ namespace Microsoft.Azure.IIoT.Storage.Default {
     /// <summary>
     /// Stores in memory (no persistence)
     /// </summary>
-    public class MemoryPersistence : IPersistenceProvider {
+    public sealed class MemoryPersistence : IPersistenceProvider {
 
         /// <summary>
         /// Create in memory persistence provider

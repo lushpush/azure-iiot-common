@@ -64,15 +64,22 @@ namespace Microsoft.Azure.IIoT.Storage {
             string etag = null);
 
         /// <summary>
-        /// Query items
+        /// Query items using expressions
         /// </summary>
         /// <param name="query"></param>
         /// <param name="partitionKey"></param>
         /// <param name="pageSize"></param>
         /// <returns></returns>
-        IDocumentFeed<R> Query<T, R>(
+        IResultFeed<R> Query<T, R>(
             Func<IQueryable<IDocument<T>>, IQueryable<R>> query,
             int? pageSize = null, string partitionKey = null);
+
+        /// <summary>
+        /// Query using sql. If not supported will throw.
+        /// </summary>
+        /// <exception cref="NotSupportedException"/>
+        /// <returns></returns>
+        ISqlQueryClient OpenSqlQueryClient();
 
         /// <summary>
         /// Removes the item.

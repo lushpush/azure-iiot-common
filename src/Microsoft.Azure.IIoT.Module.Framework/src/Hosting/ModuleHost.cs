@@ -25,7 +25,7 @@ namespace Microsoft.Azure.IIoT.Module.Framework.Hosting {
     /// <summary>
     /// Module host implementation
     /// </summary>
-    public class ModuleHost : IModuleHost, ITwinProperties, IEventEmitter,
+    public sealed class ModuleHost : IModuleHost, ITwinProperties, IEventEmitter,
         IBlobUpload, IJsonMethodClient {
 
         /// <inheritdoc/>

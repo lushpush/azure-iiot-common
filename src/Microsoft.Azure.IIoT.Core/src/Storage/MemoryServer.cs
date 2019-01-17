@@ -17,26 +17,26 @@ namespace Microsoft.Azure.IIoT.Storage {
     /// <summary>
     /// In memory database service (for testing)
     /// </summary>
-    public class MemoryDocuments : IDocumentServer {
+    public sealed class MemoryServer : IDatabaseServer {
 
         /// <summary>
         /// Create service
         /// </summary>
         /// <param name="logger"></param>
-        public MemoryDocuments(ILogger logger) {
+        public MemoryServer(ILogger logger) {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         /// <inheritdoc/>
-        public Task<IDocumentDatabase> OpenAsync(string id) {
-            return Task.FromResult<IDocumentDatabase>(_databases.GetOrAdd(id ?? "",
+        public Task<IDatabase> OpenAsync(string id) {
+            return Task.FromResult<IDatabase>(_databases.GetOrAdd(id ?? "",
                 k => new MemoryDatabase(_logger)));
         }
 
         /// <summary>
         /// In memory database
         /// </summary>
-        private class MemoryDatabase : IDocumentDatabase {
+        private class MemoryDatabase : IDatabase {
 
             /// <summary>
             /// Create service
@@ -58,9 +58,14 @@ namespace Microsoft.Azure.IIoT.Storage {
             }
 
             /// <inheritdoc/>
-            public Task<IDocumentCollection> OpenCollectionAsync(string id, bool partitioned) {
+            public Task<IDocumentCollection> OpenDocumentCollectionAsync(string id, bool partitioned) {
                 return Task.FromResult<IDocumentCollection>(_collections.GetOrAdd(id ?? "",
                     k => new MemoryCollection(_logger)));
+            }
+
+            /// <inheritdoc/>
+            public Task<IGraph> OpenGraphCollectionAsync(string id, bool partitioned) {
+                throw new NotSupportedException();
             }
 
             private readonly ConcurrentDictionary<string, MemoryCollection> _collections =
@@ -72,7 +77,6 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// In memory collection
         /// </summary>
         private class MemoryCollection : IDocumentCollection {
-
 
             /// <summary>
             /// Create service
@@ -137,7 +141,7 @@ namespace Microsoft.Azure.IIoT.Storage {
             }
 
             /// <inheritdoc/>
-            public IDocumentFeed<R> Query<T, R>(Func<IQueryable<IDocument<T>>,
+            public IResultFeed<R> Query<T, R>(Func<IQueryable<IDocument<T>>,
                 IQueryable<R>> query, int? pageSize, string partitionKey) {
                 var results = query(_data.Values
                     .OfType<IDocument<T>>()
@@ -205,6 +209,11 @@ namespace Microsoft.Azure.IIoT.Storage {
 #if LOG_VERBOSE
                 _logger.Info($"{newDoc}");
 #endif
+            }
+
+            /// <inheritdoc/>
+            public ISqlQueryClient OpenSqlQueryClient() {
+                throw new NotSupportedException();
             }
 
             /// <summary>
@@ -291,7 +300,7 @@ namespace Microsoft.Azure.IIoT.Storage {
             /// <summary>
             /// Memory feed
             /// </summary>
-            private class MemoryFeed<T> : IDocumentFeed<T> {
+            private class MemoryFeed<T> : IResultFeed<T> {
 
                 /// <summary>
                 /// Create feed

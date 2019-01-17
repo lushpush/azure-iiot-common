@@ -20,7 +20,7 @@ namespace Microsoft.Azure.IIoT.Hub.Clients {
     /// <summary>
     /// Implementation of twin and job services using service sdk.
     /// </summary>
-    public class IoTHubServiceClient : IIoTHubTwinServices, IIoTHubJobServices,
+    public sealed class IoTHubServiceClient : IIoTHubTwinServices, IIoTHubJobServices,
         IIoTHubConfigurationServices {
 
         /// <summary>

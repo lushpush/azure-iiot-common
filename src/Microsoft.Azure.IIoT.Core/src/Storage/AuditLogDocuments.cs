@@ -13,14 +13,14 @@ namespace Microsoft.Azure.IIoT.Storage {
     /// <summary>
     /// Log entry writer based on cosmos db collection
     /// </summary>
-    public class AuditLogDocuments : IAuditLog {
+    public sealed class AuditLogDocuments : IAuditLog {
 
         /// <summary>
         /// Create writer
         /// </summary>
         /// <param name="server"></param>
         /// <param name="logger"></param>
-        public AuditLogDocuments(IDocumentServer server, ILogger logger) {
+        public AuditLogDocuments(IDatabaseServer server, ILogger logger) {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _server = server ?? throw new ArgumentNullException(nameof(server));
         }
@@ -28,7 +28,7 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// <inheritdoc/>
         public async Task<IAuditLogWriter> OpenAsync(string log) {
             var database = await _server.OpenAsync();
-            var collection = await database.OpenCollectionAsync(log);
+            var collection = await database.OpenDocumentCollectionAsync(log);
             return new CollectionWriter(collection);
         }
 
@@ -53,6 +53,6 @@ namespace Microsoft.Azure.IIoT.Storage {
         }
 
         private readonly ILogger _logger;
-        private readonly IDocumentServer _server;
+        private readonly IDatabaseServer _server;
     }
 }

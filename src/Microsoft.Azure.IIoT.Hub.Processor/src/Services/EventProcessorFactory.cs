@@ -17,7 +17,7 @@ namespace Microsoft.Azure.IIoT.Hub.Processor.Services {
     /// <summary>
     /// Default iot hub event processor factory implementation
     /// </summary>
-    public class EventProcessorFactory : IEventProcessorFactory {
+    public sealed class EventProcessorFactory : IEventProcessorFactory {
 
         /// <summary>
         /// Create processor factory

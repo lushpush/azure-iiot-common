@@ -22,7 +22,7 @@ namespace Microsoft.Azure.IIoT.Hub.Clients {
     /// directly. Alternatively, there is a sdk based implementation
     /// in the Hub.Client nuget package that can also be used.
     /// </summary>
-    public class IoTHubServiceHttpClient : IoTHubHttpClientBase,
+    public sealed class IoTHubServiceHttpClient : IoTHubHttpClientBase,
         IIoTHubTwinServices, IIoTHubJobServices {
 
         /// <summary>

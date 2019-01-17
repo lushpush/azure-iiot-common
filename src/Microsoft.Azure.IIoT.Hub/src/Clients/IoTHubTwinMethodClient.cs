@@ -13,7 +13,7 @@ namespace Microsoft.Azure.IIoT.Hub.Clients {
     /// <summary>
     /// Method client using twin services
     /// </summary>
-    public class IoTHubTwinMethodClient : IJsonMethodClient {
+    public sealed class IoTHubTwinMethodClient : IJsonMethodClient {
 
         /// <inheritdoc/>
         public int MaxMethodPayloadCharacterCount => 120 * 1024;

@@ -3,20 +3,20 @@
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
+namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
     using Microsoft.Azure.Documents;
 
     /// <summary>
     /// Cosmos db document wrapper
     /// </summary>
     /// <typeparam name="T"></typeparam>
-    internal sealed class CosmosDbDocument<T> : IDocument<T> {
+    sealed class DocumentWrapper<T> : IDocument<T> {
 
         /// <summary>
         /// Create document
         /// </summary>
         /// <param name="doc"></param>
-        public CosmosDbDocument(Document doc) {
+        public DocumentWrapper(Document doc) {
             _doc = doc;
         }
 
@@ -28,12 +28,11 @@ namespace Microsoft.Azure.IIoT.Storage.Azure.Services {
 
         /// <inheritdoc/>
         public string PartitionKey => _doc.GetPropertyValue<string>(
-            CosmosDbCollection.kPartitionKeyProperty);
+            DatabaseCollection.kPartitionKeyProperty);
 
         /// <inheritdoc/>
         public string Etag => _doc.ETag;
 
         private readonly Document _doc;
     }
-
 }
