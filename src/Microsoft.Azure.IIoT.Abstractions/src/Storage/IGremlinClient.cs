@@ -18,7 +18,7 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// <param name="pageSize"></param>
         /// <param name="partitionKey"></param>
         /// <returns></returns>
-        IResultFeed<IDocument<T>> Submit<T>(string gremlin,
+        IResultFeed<T> Submit<T>(string gremlin,
             int? pageSize = null, string partitionKey = null);
     }
 }

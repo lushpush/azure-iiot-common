@@ -286,7 +286,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
 
             /// <inheritdoc/>
             public string PartitionKey => _doc.GetPropertyValue<string>(
-                QueryableCollection.kPartitionKeyProperty);
+                kPartitionKeyProperty);
 
             /// <inheritdoc/>
             public string Etag => _doc.ETag;
@@ -311,11 +311,40 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
             public void Dispose() => _wrapped.Dispose();
 
             /// <inheritdoc/>
-            public IResultFeed<IDocument<T>> Submit<T>(string gremlin,
+            public IResultFeed<T> Submit<T>(string gremlin,
                 int? pageSize = null, string partitionKey = null) {
-                throw new NotImplementedException();
+                return new GremlinQueryResult<T>(_wrapped.SubmitAsync<T>(
+                    Gremlin.Net.Driver.Messages.RequestMessage
+                        .Build(gremlin)
+                        .Create()));
             }
 
+            /// <summary>
+            /// Wraps the async query as an async result
+            /// </summary>
+            /// <typeparam name="T"></typeparam>
+            private class GremlinQueryResult<T> : IResultFeed<T> {
+                /// <inheritdoc/>
+                public GremlinQueryResult(
+                    Task<Gremlin.Net.Driver.ResultSet<T>> query) {
+                    _query = query;
+                }
+                /// <inheritdoc/>
+                public void Dispose() => _query?.Dispose();
+
+                /// <inheritdoc/>
+                public bool HasMore() => _query != null;
+
+                /// <inheritdoc/>
+                public async Task<IEnumerable<T>> ReadAsync(
+                    CancellationToken ct) {
+                    var result = await _query;
+                    _query = null;
+                    return result;
+                }
+
+                private Task<Gremlin.Net.Driver.ResultSet<T>> _query;
+            }
             private readonly GremlinClient _wrapped;
         }
 
