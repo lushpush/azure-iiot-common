@@ -34,7 +34,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
                         return await _query.ExecuteNextAsync<T>(ct);
                     }
                     catch (Exception ex) {
-                        DatabaseCollection.FilterException(ex);
+                        QueryableCollection.FilterException(ex);
                     }
                 }
                 return Enumerable.Empty<T>();

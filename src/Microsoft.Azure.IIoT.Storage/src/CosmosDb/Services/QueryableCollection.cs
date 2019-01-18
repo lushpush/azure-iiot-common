@@ -25,7 +25,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
     /// <summary>
     /// Collection abstraction
     /// </summary>
-    sealed class DatabaseCollection : IDocumentCollection, ISqlQueryClient, IGraph {
+    sealed class QueryableCollection : IDocumentCollection, ISqlQueryClient, IGraph {
 
         /// <summary>
         /// Wrapped document collection instance
@@ -39,7 +39,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         /// <param name="collection"></param>
         /// <param name="partitioned"></param>
         /// <param name="logger"></param>
-        internal DatabaseCollection(DatabaseStore db, DocumentCollection collection,
+        internal QueryableCollection(DocumentDatabase db, DocumentCollection collection,
             bool partitioned, ILogger logger) {
             _logger = logger;
             _partitioned = partitioned;
@@ -265,6 +265,36 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         }
 
         /// <summary>
+        /// Cosmos db document wrapper
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        internal sealed class DocumentWrapper<T> : IDocument<T> {
+
+            /// <summary>
+            /// Create document
+            /// </summary>
+            /// <param name="doc"></param>
+            public DocumentWrapper(Document doc) {
+                _doc = doc;
+            }
+
+            /// <inheritdoc/>
+            public string Id => _doc.Id;
+
+            /// <inheritdoc/>
+            public T Value => (T)(dynamic)_doc;
+
+            /// <inheritdoc/>
+            public string PartitionKey => _doc.GetPropertyValue<string>(
+                QueryableCollection.kPartitionKeyProperty);
+
+            /// <inheritdoc/>
+            public string Etag => _doc.ETag;
+
+            private readonly Document _doc;
+        }
+
+        /// <summary>
         /// Gremlin client
         /// </summary>
         internal class GremlinClientWrapper : IGremlinClient {
@@ -292,7 +322,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         internal const string kIdProperty = "id";
         internal const string kPartitionKeyProperty = "__pk";
 
-        private readonly DatabaseStore _db;
+        private readonly DocumentDatabase _db;
         private readonly ILogger _logger;
         private readonly bool _partitioned;
     }

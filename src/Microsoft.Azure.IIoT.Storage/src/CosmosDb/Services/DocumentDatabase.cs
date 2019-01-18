@@ -20,7 +20,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
     /// <summary>
     /// Provides document db database interface.
     /// </summary>
-    sealed class DatabaseStore : IDatabase {
+    sealed class DocumentDatabase : IDatabase {
 
         /// <summary>
         /// Database id
@@ -38,11 +38,11 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         /// <param name="client"></param>
         /// <param name="id"></param>
         /// <param name="logger"></param>
-        public DatabaseStore(DocumentClient client, string id, ILogger logger) {
+        public DocumentDatabase(DocumentClient client, string id, ILogger logger) {
             _logger = logger;
             Client = client;
             DatabaseId = id;
-            _collections = new ConcurrentDictionary<string, DatabaseCollection>();
+            _collections = new ConcurrentDictionary<string, QueryableCollection>();
         }
 
         /// <inheritdoc/>
@@ -92,7 +92,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         /// <param name="id"></param>
         /// <param name="partitioned"></param>
         /// <returns></returns>
-        private async Task<DatabaseCollection> OpenOrCreateCollectionAsync(
+        private async Task<QueryableCollection> OpenOrCreateCollectionAsync(
             string id, bool partitioned) {
             if (string.IsNullOrEmpty(id)) {
                 id = "default";
@@ -100,7 +100,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
             if (!_collections.TryGetValue(id, out var collection)) {
                 var coll = await EnsureCollectionExists(id, partitioned);
                 collection = _collections.GetOrAdd(id, k =>
-                    new DatabaseCollection(this, coll, partitioned, _logger));
+                    new QueryableCollection(this, coll, partitioned, _logger));
             }
             return collection;
         }
@@ -129,7 +129,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
 
             if (partitioned) {
                 collectionDefinition.PartitionKey.Paths.Add(
-                    "/" + DatabaseCollection.kPartitionKeyProperty);
+                    "/" + QueryableCollection.kPartitionKeyProperty);
             }
 
             var throughput = 10000;
@@ -189,6 +189,6 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         }
 
         private readonly ILogger _logger;
-        private readonly ConcurrentDictionary<string, DatabaseCollection> _collections;
+        private readonly ConcurrentDictionary<string, QueryableCollection> _collections;
     }
 }
