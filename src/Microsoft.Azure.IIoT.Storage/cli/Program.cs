@@ -35,6 +35,9 @@ namespace Microsoft.Azure.IIoT.Storage.Cli {
                     case "gremlin":
                         RunGremlinConsoleAsync(options).Wait();
                         break;
+                    case "gremlin-file":
+                        RunGremlinFileAsync(options).Wait();
+                        break;
                     case "dump":
                         DumpCollectionAsync(options).Wait();
                         break;
@@ -223,6 +226,32 @@ namespace Microsoft.Azure.IIoT.Storage.Cli {
 
                     foreach (var line in batch) {
                         Console.WriteLine($":>     {line}");
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Run gremlin from file input line by line
+        /// </summary>
+        public static async Task RunGremlinFileAsync(CliOptions options) {
+            var graph = await GetGraphAsync(options);
+            using (var gremlinClient = graph.OpenGremlinClient()) {
+                var lines = await File.ReadAllLinesAsync(
+                    options.GetValueOrDefault("-f", "--file", "gremlin.txt"));
+                foreach (var gremlin in lines) {
+                    Console.WriteLine($"\"{gremlin}\" ...");
+                    var feed = gremlinClient.Submit<dynamic>(gremlin);
+                    try {
+                        var results = await feed.AllAsync();
+                        var array = results.ToArray();
+                        for (var i = 0; i < array.Length; i++) {
+                            Console.WriteLine($"[{i + 1}]\t{array[i]}");
+                        }
+                        Console.WriteLine($"       ... {array.Length} item(s) returned.");
+                    }
+                    catch (Exception e) {
+                        Console.WriteLine(e);
                     }
                 }
             }
