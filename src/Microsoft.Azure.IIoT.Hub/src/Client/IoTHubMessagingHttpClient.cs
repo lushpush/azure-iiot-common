@@ -18,7 +18,7 @@ namespace Microsoft.Azure.IIoT.Hub.Clients {
     /// a device or module.
     /// </summary>
     public sealed class IoTHubMessagingHttpClient : IoTHubHttpClientBase,
-        IIoTHubMessagingServices {
+        IIoTHubTelemetryServices {
 
         /// <summary>
         /// Create service client
@@ -33,7 +33,7 @@ namespace Microsoft.Azure.IIoT.Hub.Clients {
 
         /// <inheritdoc/>
         public Task SendAsync(string deviceId, string moduleId,
-            DeviceMessageModel message) {
+            EventModel message) {
             if (message == null) {
                 throw new ArgumentNullException(nameof(message));
             }

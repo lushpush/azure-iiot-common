@@ -8,19 +8,15 @@ namespace Microsoft.Azure.IIoT.Hub {
     using System.Threading.Tasks;
 
     /// <summary>
-    /// Messaging service extensions
+    /// Event Hub Client
     /// </summary>
-    public static class IoTHubMessagingServicesEx {
+    public interface IEventHubClient : IEventClient {
 
         /// <summary>
-        /// Send messages for device
+        /// Send the provided message to event hub
         /// </summary>
-        /// <param name="service"></param>
-        /// <param name="deviceId"></param>
         /// <param name="message"></param>
         /// <returns></returns>
-        public static Task SendAsync(this IIoTHubTelemetryServices service,
-            string deviceId, EventModel message) =>
-            service.SendAsync(deviceId, null, message);
+        Task SendAsync(EventModel message);
     }
 }

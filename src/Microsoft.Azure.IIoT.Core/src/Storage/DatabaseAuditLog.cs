@@ -13,14 +13,14 @@ namespace Microsoft.Azure.IIoT.Storage {
     /// <summary>
     /// Log entry writer based on cosmos db collection
     /// </summary>
-    public sealed class AuditLogDocuments : IAuditLog {
+    public sealed class DatabaseAuditLog : IAuditLog {
 
         /// <summary>
         /// Create writer
         /// </summary>
         /// <param name="server"></param>
         /// <param name="logger"></param>
-        public AuditLogDocuments(IDatabaseServer server, ILogger logger) {
+        public DatabaseAuditLog(IDatabaseServer server, ILogger logger) {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _server = server ?? throw new ArgumentNullException(nameof(server));
         }

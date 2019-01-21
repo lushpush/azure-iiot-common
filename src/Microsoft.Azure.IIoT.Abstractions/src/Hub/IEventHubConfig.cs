@@ -3,32 +3,32 @@
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-namespace Microsoft.Azure.IIoT.Hub.Processor {
-    using System;
+namespace Microsoft.Azure.IIoT.Hub {
 
     /// <summary>
-    /// Eventprocessor configuration
+    /// Event hub configuration
     /// </summary>
-    public interface IEventProcessorConfig {
+    public interface IEventHubConfig {
 
         /// <summary>
-        /// Receive batch size
+        /// Event hub connection string
         /// </summary>
-        int ReceiveBatchSize { get; }
+        string EventHubConnString { get; }
 
         /// <summary>
-        /// Receive timeout
+        /// Event hub name
         /// </summary>
-        TimeSpan ReceiveTimeout { get; }
+        string EventHubPath { get; }
 
         /// <summary>
-        /// Blob storage connection string for checkpointing
+        /// Whether to use websockets
         /// </summary>
-        string BlobStorageConnString { get; }
+        bool UseWebsockets { get; }
 
         /// <summary>
-        /// And lease container name. If null, use other means.
+        /// Consumer group
+        /// (optional, default to $default)
         /// </summary>
-        string LeaseContainerName { get; }
+        string ConsumerGroup { get; }
     }
 }

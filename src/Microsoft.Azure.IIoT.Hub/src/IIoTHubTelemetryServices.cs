@@ -10,7 +10,7 @@ namespace Microsoft.Azure.IIoT.Hub {
     /// <summary>
     /// Telemetry message injection
     /// </summary>
-    public interface IIoTHubMessagingServices {
+    public interface IIoTHubTelemetryServices {
 
         /// <summary>
         /// Send the provided message on behalf of
@@ -21,6 +21,6 @@ namespace Microsoft.Azure.IIoT.Hub {
         /// <param name="message"></param>
         /// <returns></returns>
         Task SendAsync(string deviceId, string moduleId,
-            DeviceMessageModel message);
+            EventModel message);
     }
 }

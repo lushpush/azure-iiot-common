@@ -3,24 +3,30 @@
 //  Licensed under the MIT License (MIT). See License.txt in the repo root for license information.
 // ------------------------------------------------------------
 
-namespace Microsoft.Azure.IIoT.Module {
-    using Microsoft.Azure.IIoT.Exceptions;
+namespace Microsoft.Azure.IIoT.Hub {
+    using System.Collections.Generic;
     using System.Threading.Tasks;
 
     /// <summary>
-    /// Handles method call invocation
+    /// Send events
     /// </summary>
-    public interface IMethodHandler {
+    public interface IEventClient {
 
         /// <summary>
-        /// Method handler
+        /// Send event
         /// </summary>
-        /// <param name="method"></param>
-        /// <param name="payload"></param>
+        /// <param name="data"></param>
         /// <param name="contentType"></param>
-        /// <exception cref="MethodCallStatusException"/>
         /// <returns></returns>
-        Task<byte[]> InvokeAsync(string method, byte[] payload,
+        Task SendAsync(byte[] data, string contentType);
+
+        /// <summary>
+        /// Send batch of events
+        /// </summary>
+        /// <param name="batch"></param>
+        /// <param name="contentType"></param>
+        /// <returns></returns>
+        Task SendAsync(IEnumerable<byte[]> batch,
             string contentType);
     }
 }

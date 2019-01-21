@@ -9,18 +9,18 @@ namespace Microsoft.Azure.IIoT.Hub.Models {
     using Newtonsoft.Json.Linq;
 
     /// <summary>
-    /// Model of device message
+    /// Model of an event
     /// </summary>
-    public class DeviceMessageModel {
+    public class EventModel {
 
         /// <summary>
-        /// Properties
+        /// Properties of the event
         /// </summary>
         [JsonProperty(PropertyName = "properties")]
         public Dictionary<string, string> Properties { get; set; }
 
         /// <summary>
-        /// Payload
+        /// Payload of event
         /// </summary>
         [JsonProperty(PropertyName = "payload")]
         public JToken Payload { get; set; }
