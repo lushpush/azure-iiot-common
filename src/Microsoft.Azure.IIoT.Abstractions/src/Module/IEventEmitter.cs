@@ -9,7 +9,8 @@ namespace Microsoft.Azure.IIoT.Module {
     using System.Threading.Tasks;
 
     /// <summary>
-    /// Send telemetry events
+    /// Send telemetry events and property update events as
+    /// module or device identity
     /// </summary>
     public interface IEventEmitter : IIdentity, IEventClient {
 

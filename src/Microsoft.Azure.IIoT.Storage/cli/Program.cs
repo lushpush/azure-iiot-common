@@ -259,7 +259,7 @@ Commands and Options
                 .AddEnvironmentVariables()
                 .Build();
             var configuration = new CosmosDbConfig(config);
-            var server = new CosmosDbService(configuration, logger);
+            var server = new CosmosDbServiceClient(configuration, logger);
             return await server.OpenAsync(
                 options.GetValueOrDefault("-d", "--db", "default"));
         }

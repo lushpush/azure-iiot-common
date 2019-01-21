@@ -15,14 +15,14 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
     /// <summary>
     /// Provides document db and graph functionality for storage interfaces.
     /// </summary>
-    public sealed class CosmosDbService : IDatabaseServer {
+    public sealed class CosmosDbServiceClient : IDatabaseServer {
 
         /// <summary>
         /// Creates server
         /// </summary>
         /// <param name="config"></param>
         /// <param name="logger"></param>
-        public CosmosDbService(ICosmosDbConfig config, ILogger logger) {
+        public CosmosDbServiceClient(ICosmosDbConfig config, ILogger logger) {
             _config = config ?? throw new ArgumentNullException(nameof(config));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             if (string.IsNullOrEmpty(_config?.DbConnectionString)) {
