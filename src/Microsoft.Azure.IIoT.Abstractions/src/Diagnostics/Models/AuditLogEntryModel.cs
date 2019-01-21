@@ -28,11 +28,6 @@ namespace Microsoft.Azure.IIoT.Diagnostics.Models {
         public string User { get; set; }
 
         /// <summary>
-        /// Identity claims
-        /// </summary>
-        public IDictionary<string, string> Claims { get; set; }
-
-        /// <summary>
         /// Timestamp of log entry.
         /// </summary>
         public DateTime TimeStamp { get; set; }

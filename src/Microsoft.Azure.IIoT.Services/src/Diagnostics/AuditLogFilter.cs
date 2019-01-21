@@ -11,7 +11,6 @@ namespace Microsoft.Azure.IIoT.Services.Diagnostics {
     using Microsoft.AspNetCore.Mvc.Filters;
     using System;
     using System.Threading.Tasks;
-    using System.Linq;
 
     /// <summary>
     /// Create audit log entries for every action invocation
@@ -21,14 +20,15 @@ namespace Microsoft.Azure.IIoT.Services.Diagnostics {
         /// <summary>
         /// Create filter
         /// </summary>
-        /// <param name="auditor"></param>
         /// <param name="logger"></param>
-        public AuditLogFilter(IAuditLog auditor = null, ILogger logger = null) {
-            _logger = logger ?? new SimpleLogger();
-            _auditor = auditor ?? new AuditLogLogger(_logger);
+        /// <param name="auditor"></param>
+        public AuditLogFilter(ILogger logger, IAuditLog auditor = null) {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _auditor = auditor;
             if (auditor == null) {
-                _logger.Error("No audit log registered, output audit log " +
-                    "to passed in logger. Register an audit log service.");
+                _logger.Info("No audit log registered, will log audit events " +
+                    "to application log.");
+                _auditor = new AuditLogLogger(_logger);
             }
             _writer = _auditor.OpenAsync(logger.Name).Result;
         }
@@ -51,8 +51,6 @@ namespace Microsoft.Azure.IIoT.Services.Diagnostics {
             var entry = new AuditLogEntryModel {
                 Id = context.HttpContext.TraceIdentifier,
                 User = context.HttpContext.User?.Identity?.Name,
-                Claims = context.HttpContext.User?.Claims?
-                    .ToDictionary(c => c.Type, c => c.Value),
                 SessionId = sessionId,
                 OperationId = context.ActionDescriptor.Id,
                 OperationName =
@@ -93,8 +91,12 @@ namespace Microsoft.Azure.IIoT.Services.Diagnostics {
                 }
             }
             entry.Completed = DateTime.UtcNow;
-            await _writer.WriteAsync(entry);
-
+            try {
+                await _writer.WriteAsync(entry);
+            }
+            catch (Exception ex) {
+                _logger.Error($"Failed to write audit log for activity {id}", ex);
+            }
             // Let user know of the activity / audit id and return session id
             context.HttpContext.Response.Headers.Add(HttpHeader.ActivityId, id);
             if (sessionId != null) {
