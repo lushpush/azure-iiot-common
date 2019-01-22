@@ -41,10 +41,11 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         /// <param name="logger"></param>
         internal QueryableCollection(DocumentDatabase db, DocumentCollection collection,
             bool partitioned, ILogger logger) {
+            Collection = collection;
             _logger = logger;
             _partitioned = partitioned;
             _db = db;
-            Collection = collection;
+            _server = new Lazy<GremlinServer>(CreateGremlinServer);
         }
 
         /// <inheritdoc/>
@@ -67,12 +68,17 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         }
 
         /// <inheritdoc/>
-        public IGremlinClient OpenGremlinClient() {
+        public IGremlinClient OpenGremlinClient() =>
+            new GremlinClientWrapper(_server.Value);
+
+        /// <inheritdoc/>
+        public IBulkLoader GetBulkLoader() {
             throw new NotImplementedException();
         }
 
         /// <inheritdoc/>
-        public ISqlQueryClient OpenSqlQueryClient() => this;
+        public ISqlQueryClient OpenSqlQueryClient() =>
+            this;
 
         /// <inheritdoc/>
         public IResultFeed<IDocument<T>> Query<T>(string queryString,
@@ -295,6 +301,30 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         }
 
         /// <summary>
+        /// Create gremlin server from document client
+        /// </summary>
+        /// <returns></returns>
+        private GremlinServer CreateGremlinServer() {
+            var endpointHost = _db.Client.ServiceEndpoint.Host;
+            var instanceEnd = endpointHost.IndexOf('.');
+            if (instanceEnd == -1) {
+                // Support local emulation
+                if (!endpointHost.EqualsIgnoreCase("localhost")) {
+                    throw new ArgumentException("Endpoint host invalid.");
+                }
+            }
+            else {
+                // Use the instance name but the gremlin endpoint for the server.
+                endpointHost = endpointHost.Substring(0, instanceEnd) +
+                    ".gremlin.cosmosdb.azure.com";
+            }
+            var port = _db.Client.ServiceEndpoint.Port;
+            return new GremlinServer(endpointHost, port, true,
+                "/dbs/" + _db.DatabaseId + "/colls/" + Collection.Id,
+                new NetworkCredential(string.Empty, _db.Client.AuthKey).Password);
+        }
+
+        /// <summary>
         /// Gremlin client
         /// </summary>
         internal class GremlinClientWrapper : IGremlinClient {
@@ -354,6 +384,6 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         private readonly DocumentDatabase _db;
         private readonly ILogger _logger;
         private readonly bool _partitioned;
+        private readonly Lazy<GremlinServer> _server;
     }
-
 }
