@@ -12,25 +12,30 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
     using Microsoft.Azure.Documents;
     using Microsoft.Azure.Documents.Client;
     using Microsoft.Azure.Documents.Linq;
+    using Microsoft.Azure.CosmosDB.BulkExecutor;
+    using Microsoft.Azure.CosmosDB.BulkExecutor.Graph;
     using System;
     using System.Collections.Generic;
     using System.Linq;
     using System.Net;
     using System.Threading;
     using System.Threading.Tasks;
+    using System.Threading.Tasks.Dataflow;
     using Newtonsoft.Json.Linq;
-    using GremlinClient = Gremlin.Net.Driver.GremlinClient;
-    using GremlinServer = Gremlin.Net.Driver.GremlinServer;
+    using Gremlin.Net.CosmosDb;
+    using Gremlin.Net.CosmosDb.Structure;
+    using Gremlin.Net.Process.Traversal;
+    using CosmosDbCollection = Documents.DocumentCollection;
 
     /// <summary>
     /// Collection abstraction
     /// </summary>
-    sealed class QueryableCollection : IDocumentCollection, ISqlQueryClient, IGraph {
+    sealed class DocumentCollection : IDocumentCollection, ISqlQueryClient, IGraph {
 
         /// <summary>
         /// Wrapped document collection instance
         /// </summary>
-        internal DocumentCollection Collection { get; }
+        internal CosmosDbCollection Collection { get; }
 
         /// <summary>
         /// Create collection
@@ -39,13 +44,12 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         /// <param name="collection"></param>
         /// <param name="partitioned"></param>
         /// <param name="logger"></param>
-        internal QueryableCollection(DocumentDatabase db, DocumentCollection collection,
+        internal DocumentCollection(DocumentDatabase db, CosmosDbCollection collection,
             bool partitioned, ILogger logger) {
             Collection = collection;
             _logger = logger;
             _partitioned = partitioned;
             _db = db;
-            _server = new Lazy<GremlinServer>(CreateGremlinServer);
         }
 
         /// <inheritdoc/>
@@ -64,16 +68,44 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
                        PartitionKey = pk,
                        EnableCrossPartitionQuery = pk == null
                    }).Select(d => (IDocument<T>)new DocumentWrapper<T>(d)));
-            return new DocumentFeed<R>(result.AsDocumentQuery(), _logger);
+            return new ResultFeed<R>(result.AsDocumentQuery(), _logger);
         }
 
         /// <inheritdoc/>
-        public IGremlinClient OpenGremlinClient() =>
-            new GremlinClientWrapper(_server.Value);
+        public async Task<IGraphLoader> OpenBulkLoader() {
+
+            // Clone client to set specific connection policy
+            var client = new DocumentClient(_db.Client.ServiceEndpoint,
+                new NetworkCredential(null, _db.Client.AuthKey).Password,
+                _db.Client.ConnectionPolicy, _db.Client.ConsistencyLevel);
+            client.ConnectionPolicy.RetryOptions.MaxRetryWaitTimeInSeconds = 30;
+            client.ConnectionPolicy.RetryOptions.MaxRetryAttemptsOnThrottledRequests = 9;
+
+            var executor = new GraphBulkExecutor(client, Collection);
+            await executor.InitializeAsync();
+            return new GraphLoader(executor, _logger);
+        }
 
         /// <inheritdoc/>
-        public IBulkLoader GetBulkLoader() {
-            throw new NotImplementedException();
+        public IGremlinClient OpenGremlinClient() {
+            var endpointHost = _db.Client.ServiceEndpoint.Host;
+            var instanceEnd = endpointHost.IndexOf('.');
+            if (instanceEnd == -1) {
+                // Support local emulation
+                if (!endpointHost.EqualsIgnoreCase("localhost")) {
+                    throw new ArgumentException("Endpoint host invalid.");
+                }
+            }
+            else {
+                // Use the instance name but the gremlin endpoint for the server.
+                endpointHost = endpointHost.Substring(0, instanceEnd) +
+                    ".gremlin.cosmosdb.azure.com";
+            }
+            var port = _db.Client.ServiceEndpoint.Port;
+            var client = new GraphClient(endpointHost + ":" + port,
+                _db.DatabaseId, Collection.Id,
+                new NetworkCredential(string.Empty, _db.Client.AuthKey).Password);
+            return new GremlinTraversalClient(client);
         }
 
         /// <inheritdoc/>
@@ -102,7 +134,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
                     PartitionKey = pk,
                     EnableCrossPartitionQuery = pk == null
                 }).Select(d => (IDocument<T>)new DocumentWrapper<T>(d));
-            return new DocumentFeed<IDocument<T>>(query.AsDocumentQuery(), _logger);
+            return new ResultFeed<IDocument<T>>(query.AsDocumentQuery(), _logger);
         }
 
         /// <inheritdoc/>
@@ -119,7 +151,6 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
                         return new DocumentWrapper<T>(await _db.Client.ReadDocumentAsync(
                             UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, id),
                             new RequestOptions { PartitionKey = pk }, ct));
-
                     }
                     catch (Exception ex) {
                         FilterException(ex);
@@ -143,9 +174,9 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
                 new PartitionKey(partitionKey);
             return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                 try {
-                    return new DocumentWrapper<T>(await _db.Client.UpsertDocumentAsync(
+                    return new DocumentWrapper<T>(await this._db.Client.UpsertDocumentAsync(
                         UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
-                        GetItem(id, newItem, partitionKey),
+                        DocumentCollection.GetItem(id, newItem, partitionKey),
                         new RequestOptions { AccessCondition = ac, PartitionKey = pk },
                         false, ct));
                 }
@@ -170,9 +201,9 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
                 new PartitionKey(existing.PartitionKey);
             return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                 try {
-                    return new DocumentWrapper<T>(await _db.Client.ReplaceDocumentAsync(
+                    return new DocumentWrapper<T>(await this._db.Client.ReplaceDocumentAsync(
                         UriFactory.CreateDocumentUri(_db.DatabaseId, Collection.Id, existing.Id),
-                        GetItem(existing.Id, newItem, existing.PartitionKey),
+                        DocumentCollection.GetItem(existing.Id, newItem, existing.PartitionKey),
                         new RequestOptions { AccessCondition = ac, PartitionKey = pk }, ct));
                 }
                 catch (Exception ex) {
@@ -189,10 +220,10 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
                 new PartitionKey(partitionKey);
             return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                 try {
-                    return new DocumentWrapper<T>(await _db.Client.CreateDocumentAsync(
+                    return new DocumentWrapper<T>(await this._db.Client.CreateDocumentAsync(
                         UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Collection.Id),
-                        GetItem(id, newItem, partitionKey), new RequestOptions { PartitionKey = pk },
-                        false, ct));
+                        DocumentCollection.GetItem(id, newItem, partitionKey),
+                        new RequestOptions { PartitionKey = pk }, false, ct));
                 }
                 catch (Exception ex) {
                     FilterException(ex);
@@ -301,52 +332,40 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         }
 
         /// <summary>
-        /// Create gremlin server from document client
+        /// Gremlin traversal client
         /// </summary>
-        /// <returns></returns>
-        private GremlinServer CreateGremlinServer() {
-            var endpointHost = _db.Client.ServiceEndpoint.Host;
-            var instanceEnd = endpointHost.IndexOf('.');
-            if (instanceEnd == -1) {
-                // Support local emulation
-                if (!endpointHost.EqualsIgnoreCase("localhost")) {
-                    throw new ArgumentException("Endpoint host invalid.");
-                }
-            }
-            else {
-                // Use the instance name but the gremlin endpoint for the server.
-                endpointHost = endpointHost.Substring(0, instanceEnd) +
-                    ".gremlin.cosmosdb.azure.com";
-            }
-            var port = _db.Client.ServiceEndpoint.Port;
-            return new GremlinServer(endpointHost, port, true,
-                "/dbs/" + _db.DatabaseId + "/colls/" + Collection.Id,
-                new NetworkCredential(string.Empty, _db.Client.AuthKey).Password);
-        }
-
-        /// <summary>
-        /// Gremlin client
-        /// </summary>
-        internal class GremlinClientWrapper : IGremlinClient {
+        private class GremlinTraversalClient : IGremlinTraversal {
 
             /// <summary>
             /// Create wrapper
             /// </summary>
-            /// <param name="server"></param>
-            public GremlinClientWrapper(GremlinServer server) {
-                _wrapped = new GremlinClient(server, null, null, null);
+            /// <param name="client"></param>
+            internal GremlinTraversalClient(GraphClient client) {
+                _client = client;
             }
 
             /// <inheritdoc/>
-            public void Dispose() => _wrapped.Dispose();
+            public void Dispose() => _client.Dispose();
+
+            /// <inheritdoc/>
+            public ITraversal V(params (string, string)[] ids) =>
+                _client.CreateTraversalSource().V(ids
+                    .Select(id => (PartitionKeyIdPair)id).ToArray());
+
+            /// <inheritdoc/>
+            public ITraversal E(params string[] ids) =>
+                _client.CreateTraversalSource().E(ids);
 
             /// <inheritdoc/>
             public IResultFeed<T> Submit<T>(string gremlin,
                 int? pageSize = null, string partitionKey = null) {
-                return new GremlinQueryResult<T>(_wrapped.SubmitAsync<T>(
-                    Gremlin.Net.Driver.Messages.RequestMessage
-                        .Build(gremlin)
-                        .Create()));
+                return new GremlinQueryResult<T>(_client.QueryAsync<T>(gremlin));
+            }
+
+            /// <inheritdoc/>
+            public IResultFeed<T> Submit<T>(ITraversal gremlin,
+                int? pageSize = null, string partitionKey = null) {
+                return new GremlinQueryResult<T>(_client.QueryAsync<T>(gremlin));
             }
 
             /// <summary>
@@ -356,7 +375,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
             private class GremlinQueryResult<T> : IResultFeed<T> {
                 /// <inheritdoc/>
                 public GremlinQueryResult(
-                    Task<Gremlin.Net.Driver.ResultSet<T>> query) {
+                    Task<GraphResult<T>> query) {
                     _query = query;
                 }
                 /// <inheritdoc/>
@@ -373,9 +392,107 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
                     return result;
                 }
 
-                private Task<Gremlin.Net.Driver.ResultSet<T>> _query;
+                private Task<GraphResult<T>> _query;
             }
-            private readonly GremlinClient _wrapped;
+            private readonly GraphClient _client;
+        }
+
+        /// <summary>
+        /// Bulk graph loader, handles loading in batches of default 10000.
+        /// </summary>
+        private sealed class GraphLoader : IGraphLoader {
+
+            /// <summary>
+            /// Create loader
+            /// </summary>
+            /// <param name="executor"></param>
+            /// <param name="logger"></param>
+            /// <param name="addOnly"></param>
+            /// <param name="bulkSize"></param>
+            internal GraphLoader(IBulkExecutor executor, ILogger logger,
+                bool addOnly = false, int bulkSize = 10000) {
+                _executor = executor;
+                _logger = logger;
+                _bulkSize = bulkSize;
+                _addOnly = addOnly;
+
+                // Set up batch blocks
+                _batcher = new BatchBlock<object>(_bulkSize,
+                    new GroupingDataflowBlockOptions());
+                var importer = new ActionBlock<object[]>(ProcessBatch,
+                    new ExecutionDataflowBlockOptions {
+                        BoundedCapacity = 1,
+                        MaxDegreeOfParallelism = 1,
+                        SingleProducerConstrained = true
+                    });
+                // Connect the output to the action handler
+                _batcher.LinkTo(importer, new DataflowLinkOptions {
+                    PropagateCompletion = true
+                });
+                // When done, cause end to be called
+                _complete = _batcher.Completion
+                    .ContinueWith(async t => {
+                        importer.Complete();
+                    // Drain
+                    await importer.Completion;
+                    });
+                _cts = new CancellationTokenSource();
+            }
+
+            /// <inheritdoc/>
+            public Task CompleteAsync(bool abort) {
+                if (abort) {
+                    // Cancel current import
+                    _cts.Cancel();
+                }
+                _batcher.Complete();
+                return _complete.Result;
+            }
+
+            /// <inheritdoc/>
+            public Task AddVertexAsync<V>(V vertex) =>
+                _batcher.SendAsync(vertex.ToVertex());
+
+            /// <inheritdoc/>
+            public Task AddEdgeAsync<V1, E, V2>(V1 from, E edge, V2 to) =>
+                _batcher.SendAsync(edge.ToEdge(from, to));
+
+            /// <summary>
+            /// Imports a batch of objects
+            /// </summary>
+            /// <param name="obj"></param>
+            /// <returns></returns>
+            private Task ProcessBatch(object[] obj) {
+                return Retry.WithExponentialBackoff(_logger, _cts.Token, async () => {
+                    try {
+                        var response = await _executor.BulkImportAsync(obj, !_addOnly,
+                            true, null, null, _cts.Token);
+
+                        // Log result
+                        var wps = Math.Round(response.NumberOfDocumentsImported /
+                            response.TotalTimeTaken.TotalSeconds);
+                        var rps = Math.Round(response.TotalRequestUnitsConsumed /
+                            response.TotalTimeTaken.TotalSeconds);
+                        var rpi = response.TotalRequestUnitsConsumed /
+                            response.NumberOfDocumentsImported;
+                        _logger.Info($"Processed {response.NumberOfDocumentsImported} " +
+                            $"elements in {response.TotalTimeTaken.TotalSeconds} sec " +
+                            $"({wps} writes/s, {rps} RU/s, {rpi} RU/Element).");
+                    }
+                    catch (Exception ex) {
+                        FilterException(ex);
+                        return;
+                    }
+                });
+            }
+
+            private readonly Task<Task> _complete;
+            private readonly CancellationTokenSource _cts;
+            private readonly BatchBlock<object> _batcher;
+            private readonly int _bulkSize;
+            private readonly bool _addOnly;
+            private readonly ILogger _logger;
+            private readonly IBulkExecutor _executor;
         }
 
         internal const string kIdProperty = "id";
@@ -384,6 +501,5 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         private readonly DocumentDatabase _db;
         private readonly ILogger _logger;
         private readonly bool _partitioned;
-        private readonly Lazy<GremlinServer> _server;
     }
 }

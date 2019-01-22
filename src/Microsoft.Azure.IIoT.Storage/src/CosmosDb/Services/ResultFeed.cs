@@ -16,12 +16,12 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
     /// <summary>
     /// Wraps a document query to return statements
     /// </summary>
-    internal class DocumentFeed<T> : IResultFeed<T> {
+    internal class ResultFeed<T> : IResultFeed<T> {
 
         /// <summary>
         /// Create feed
         /// </summary>
-        internal DocumentFeed(IDocumentQuery<T> query, ILogger logger) {
+        internal ResultFeed(IDocumentQuery<T> query, ILogger logger) {
             _query = query;
             _logger = logger;
         }
@@ -34,7 +34,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
                         return await _query.ExecuteNextAsync<T>(ct);
                     }
                     catch (Exception ex) {
-                        QueryableCollection.FilterException(ex);
+                        DocumentCollection.FilterException(ex);
                     }
                 }
                 return Enumerable.Empty<T>();

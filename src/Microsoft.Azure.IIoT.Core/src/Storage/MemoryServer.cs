@@ -325,7 +325,7 @@ namespace Microsoft.Azure.IIoT.Storage {
 
             private readonly Dictionary<string, MemoryDocument> _data =
                 new Dictionary<string, MemoryDocument>();
-            private ILogger _logger;
+            private readonly ILogger _logger;
         }
 
         private readonly ConcurrentDictionary<string, MemoryDatabase> _databases =

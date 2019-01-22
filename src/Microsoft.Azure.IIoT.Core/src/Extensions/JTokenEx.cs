@@ -109,16 +109,39 @@ namespace Newtonsoft.Json.Linq {
         /// <param name="defaultValue"></param>
         /// <returns></returns>
         public static T GetValueOrDefault<T>(this JToken t,
-            string key, T defaultValue) {
+            string key, T defaultValue) =>
+            GetValueOrDefault(t, key, () => defaultValue);
+
+        /// <summary>
+        /// Helper to get values from object
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="t"></param>
+        /// <param name="key"></param>
+        /// <returns></returns>
+        public static T GetValueOrDefault<T>(this JToken t,
+            string key) =>
+            GetValueOrDefault(t, key, () => default(T));
+
+        /// <summary>
+        /// Helper to get values from object
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="t"></param>
+        /// <param name="key"></param>
+        /// <param name="defaultValue"></param>
+        /// <returns></returns>
+        public static T GetValueOrDefault<T>(this JToken t,
+            string key, Func<T> defaultValue) {
             if (t is JObject o && o.TryGetValue(key, out var token)) {
                 try {
                     return token.ToObject<T>();
                 }
                 catch {
-                    return defaultValue;
+                    return defaultValue();
                 }
             }
-            return defaultValue;
+            return defaultValue();
         }
 
         /// <summary>
@@ -130,17 +153,29 @@ namespace Newtonsoft.Json.Linq {
         /// <param name="defaultValue"></param>
         /// <returns></returns>
         public static T? GetValueOrDefault<T>(this JToken t,
-            string key, T? defaultValue) where T : struct {
+            string key, T? defaultValue) where T : struct =>
+            GetValueOrDefault(t, key, () => defaultValue);
+
+        /// <summary>
+        /// Helper to get values from object
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="t"></param>
+        /// <param name="key"></param>
+        /// <param name="defaultValue"></param>
+        /// <returns></returns>
+        public static T? GetValueOrDefault<T>(this JToken t,
+            string key, Func<T?> defaultValue) where T : struct {
 
             if (t is JObject o && o.TryGetValue(key, out var token)) {
                 try {
                     return token.ToObject<T>();
                 }
                 catch {
-                    return defaultValue;
+                    return defaultValue();
                 }
             }
-            return defaultValue;
+            return defaultValue();
         }
 
         /// <summary>

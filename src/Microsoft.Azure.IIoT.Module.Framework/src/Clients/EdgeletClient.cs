@@ -94,7 +94,7 @@ namespace Microsoft.Azure.IIoT.Module.Framework.Hosting {
                 var response = await _client.PostAsync(request);
                 response.Validate();
                 return JObject.Parse(response.GetContentAsString())?
-                    .GetValueOrDefault<byte[]>("ciphertext", null);
+                    .GetValueOrDefault<byte[]>("ciphertext");
             });
         }
 
@@ -109,7 +109,7 @@ namespace Microsoft.Azure.IIoT.Module.Framework.Hosting {
                 var response = await _client.PostAsync(request);
                 response.Validate();
                 return JObject.Parse(response.GetContentAsString())?
-                    .GetValueOrDefault<byte[]>("plaintext", null);
+                    .GetValueOrDefault<byte[]>("plaintext");
             });
         }
 

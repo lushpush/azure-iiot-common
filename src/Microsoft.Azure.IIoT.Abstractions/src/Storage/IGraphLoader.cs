@@ -4,12 +4,39 @@
 // ------------------------------------------------------------
 
 namespace Microsoft.Azure.IIoT.Storage {
+    using System.Threading.Tasks;
 
     /// <summary>
-    /// Graph bulk loader interface
+    /// Interface to bulk load edges and vertices into
+    /// a graph.
     /// </summary>
-    public interface IBulkLoader {
+    public interface IGraphLoader {
 
+        /// <summary>
+        /// Upsert vertex
+        /// </summary>
+        /// <typeparam name="V"></typeparam>
+        /// <param name="vertex"></param>
+        /// <returns></returns>
+        Task AddVertexAsync<V>(V vertex);
 
+        /// <summary>
+        /// Upsert edge
+        /// </summary>
+        /// <typeparam name="V1"></typeparam>
+        /// <typeparam name="E"></typeparam>
+        /// <typeparam name="V2"></typeparam>
+        /// <param name="from"></param>
+        /// <param name="edge"></param>
+        /// <param name="to"></param>
+        /// <returns></returns>
+        Task AddEdgeAsync<V1, E, V2>(V1 from, E edge, V2 to);
+
+        /// <summary>
+        /// Complete or abort processing
+        /// </summary>
+        /// <param name="abort"></param>
+        /// <returns></returns>
+        Task CompleteAsync(bool abort);
     }
 }

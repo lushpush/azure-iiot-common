@@ -42,7 +42,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
             _logger = logger;
             Client = client;
             DatabaseId = id;
-            _collections = new ConcurrentDictionary<string, QueryableCollection>();
+            _collections = new ConcurrentDictionary<string, DocumentCollection>();
         }
 
         /// <inheritdoc/>
@@ -92,7 +92,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         /// <param name="id"></param>
         /// <param name="partitioned"></param>
         /// <returns></returns>
-        private async Task<QueryableCollection> OpenOrCreateCollectionAsync(
+        private async Task<DocumentCollection> OpenOrCreateCollectionAsync(
             string id, bool partitioned) {
             if (string.IsNullOrEmpty(id)) {
                 id = "default";
@@ -100,7 +100,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
             if (!_collections.TryGetValue(id, out var collection)) {
                 var coll = await EnsureCollectionExists(id, partitioned);
                 collection = _collections.GetOrAdd(id, k =>
-                    new QueryableCollection(this, coll, partitioned, _logger));
+                    new DocumentCollection(this, coll, partitioned, _logger));
             }
             return collection;
         }
@@ -114,7 +114,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         private async Task<Documents.DocumentCollection> EnsureCollectionExists(string id,
             bool partitioned) {
             var database = await Client.CreateDatabaseIfNotExistsAsync(
-                new Documents.Database {
+                new Database {
                     Id = DatabaseId
                 }
             );
@@ -129,7 +129,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
 
             if (partitioned) {
                 collectionDefinition.PartitionKey.Paths.Add(
-                    "/" + QueryableCollection.kPartitionKeyProperty);
+                    "/" + DocumentCollection.kPartitionKeyProperty);
             }
 
             var throughput = 10000;
@@ -140,55 +140,10 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
                      OfferThroughput = throughput
                  }
             );
-
-            // await CreateSprocIfNotExists(id, kBulkUpdateSprocName);
-            // await CreateSprocIfNotExists(id, kBulkDeleteSprocName);
             return collection.Resource;
         }
 
-        /// <summary>
-        /// Create stored procedures
-        /// </summary>
-        /// <param name="collectionId"></param>
-        /// <param name="sprocName"></param>
-        /// <returns></returns>
-        private async Task CreateSprocIfNotExists(string collectionId, string sprocName) {
-            var assembly = GetType().Assembly;
-#if FALSE
-            try {
-                var sprocUri = UriFactory.CreateStoredProcedureUri(
-                    DatabaseId, collectionId, sprocName);
-                await _client.DeleteStoredProcedureAsync(sprocUri);
-            }
-            catch (DocumentClientException) {}
-#endif
-            var resource = $"{assembly.GetName().Name}.Azure.Script.{sprocName}.js";
-            using (var stream = assembly.GetManifestResourceStream(resource)) {
-                if (stream == null) {
-                    throw new FileNotFoundException(resource + " not found");
-                }
-                var sproc = new StoredProcedure {
-                    Id = sprocName,
-                    Body = stream.ReadAsString(Encoding.UTF8)
-                };
-                try {
-                    var sprocUri = UriFactory.CreateStoredProcedureUri(
-                        DatabaseId, collectionId, sprocName);
-                    await Client.ReadStoredProcedureAsync(sprocUri);
-                    return;
-                }
-                catch (DocumentClientException de) {
-                    if (de.StatusCode != HttpStatusCode.NotFound) {
-                        throw;
-                    }
-                }
-                await Client.CreateStoredProcedureAsync(
-                    UriFactory.CreateDocumentCollectionUri(DatabaseId,
-                    collectionId), sproc);
-            }
-        }
-
         private readonly ILogger _logger;
-        private readonly ConcurrentDictionary<string, QueryableCollection> _collections;
+        private readonly ConcurrentDictionary<string, DocumentCollection> _collections;
     }
 }

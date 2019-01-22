@@ -4,25 +4,25 @@
 // ------------------------------------------------------------
 
 namespace Microsoft.Azure.IIoT.Storage {
-    using System.Threading.Tasks;
 
     /// <summary>
-    /// Graph interface
+    /// Common document properties
     /// </summary>
-    public interface IGraph {
+    public static class DocumentProperties {
 
         /// <summary>
-        /// Open gremlin client to collection
+        /// Identifier property
         /// </summary>
-        /// <exception cref="System.NotSupportedException"/>
-        /// <returns></returns>
-        IGremlinClient OpenGremlinClient();
+        public const string kIdKey = "id";
 
         /// <summary>
-        /// Open bulk loader if supported
+        /// Label property
         /// </summary>
-        /// <exception cref="System.NotSupportedException"/>
-        /// <returns></returns>
-        Task<IGraphLoader> OpenBulkLoader();
+        public const string kLabelKey = "label";
+
+        /// <summary>
+        /// Partition key property
+        /// </summary>
+        public const string kPartitionKey = "__pk";
     }
 }
