@@ -72,7 +72,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         }
 
         /// <inheritdoc/>
-        public async Task<IGraphLoader> OpenBulkLoader() {
+        public async Task<IGraphLoader> CreateBulkLoader() {
 
             // Clone client to set specific connection policy
             var client = new DocumentClient(_db.Client.ServiceEndpoint,

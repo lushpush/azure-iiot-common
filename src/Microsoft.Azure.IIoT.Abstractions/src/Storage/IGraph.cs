@@ -23,6 +23,6 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// </summary>
         /// <exception cref="System.NotSupportedException"/>
         /// <returns></returns>
-        Task<IGraphLoader> OpenBulkLoader();
+        Task<IGraphLoader> CreateBulkLoader();
     }
 }
