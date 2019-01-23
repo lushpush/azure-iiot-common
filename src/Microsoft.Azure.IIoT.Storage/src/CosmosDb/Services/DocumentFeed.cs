@@ -16,12 +16,12 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
     /// <summary>
     /// Wraps a document query to return statements
     /// </summary>
-    internal class ResultFeed<T> : IResultFeed<T> {
+    internal class DocumentFeed<T> : IResultFeed<T> {
 
         /// <summary>
         /// Create feed
         /// </summary>
-        internal ResultFeed(IDocumentQuery<T> query, ILogger logger) {
+        internal DocumentFeed(IDocumentQuery<T> query, ILogger logger) {
             _query = query;
             _logger = logger;
         }

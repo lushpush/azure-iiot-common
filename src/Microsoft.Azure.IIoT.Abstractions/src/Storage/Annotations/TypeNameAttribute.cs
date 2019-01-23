@@ -3,16 +3,17 @@ namespace Microsoft.Azure.IIoT.Storage.Annotations {
     using System;
 
     /// <summary>
-    /// Declarative label name of a schema-bound graph element
+    /// Declarative type name
     /// </summary>
-    /// <seealso cref="System.Attribute"/>
+    /// <seealso cref="Attribute"/>
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Property,
         AllowMultiple = false, Inherited = false)]
     public sealed class TypeNameAttribute : Attribute {
+
         /// <summary>
         /// Gets the name.
         /// </summary>
-        public string Name { get; private set; }
+        public string Name { get; }
 
         /// <summary>
         /// Initializes a new instance of the

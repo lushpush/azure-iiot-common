@@ -26,11 +26,12 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// <typeparam name="V1"></typeparam>
         /// <typeparam name="E"></typeparam>
         /// <typeparam name="V2"></typeparam>
-        /// <param name="from"></param>
+        /// <param name="outVertex"></param>
         /// <param name="edge"></param>
-        /// <param name="to"></param>
+        /// <param name="inVertex"></param>
         /// <returns></returns>
-        Task AddEdgeAsync<V1, E, V2>(V1 from, E edge, V2 to);
+        Task AddEdgeAsync<V1, E, V2>(V1 outVertex,
+            E edge, V2 inVertex);
 
         /// <summary>
         /// Complete or abort processing

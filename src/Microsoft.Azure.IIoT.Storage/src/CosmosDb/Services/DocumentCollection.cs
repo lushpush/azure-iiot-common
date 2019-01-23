@@ -68,7 +68,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
                        PartitionKey = pk,
                        EnableCrossPartitionQuery = pk == null
                    }).Select(d => (IDocument<T>)new DocumentWrapper<T>(d)));
-            return new ResultFeed<R>(result.AsDocumentQuery(), _logger);
+            return new DocumentFeed<R>(result.AsDocumentQuery(), _logger);
         }
 
         /// <inheritdoc/>
@@ -134,7 +134,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
                     PartitionKey = pk,
                     EnableCrossPartitionQuery = pk == null
                 }).Select(d => (IDocument<T>)new DocumentWrapper<T>(d));
-            return new ResultFeed<IDocument<T>>(query.AsDocumentQuery(), _logger);
+            return new DocumentFeed<IDocument<T>>(query.AsDocumentQuery(), _logger);
         }
 
         /// <inheritdoc/>
