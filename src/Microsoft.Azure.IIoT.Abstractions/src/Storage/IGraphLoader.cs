@@ -4,13 +4,14 @@
 // ------------------------------------------------------------
 
 namespace Microsoft.Azure.IIoT.Storage {
+    using System;
     using System.Threading.Tasks;
 
     /// <summary>
     /// Interface to bulk load edges and vertices into
     /// a graph.
     /// </summary>
-    public interface IGraphLoader {
+    public interface IGraphLoader : IDisposable {
 
         /// <summary>
         /// Upsert vertex
@@ -38,6 +39,6 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// </summary>
         /// <param name="abort"></param>
         /// <returns></returns>
-        Task CompleteAsync(bool abort);
+        Task CompleteAsync(bool abort= false);
     }
 }

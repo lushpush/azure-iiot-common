@@ -440,6 +440,10 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
             }
 
             /// <inheritdoc/>
+            public void Dispose() =>
+                Try.Op(() => CompleteAsync(true).Wait());
+
+            /// <inheritdoc/>
             public Task CompleteAsync(bool abort) {
                 if (abort) {
                     // Cancel current import
@@ -485,6 +489,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
                     }
                 });
             }
+
 
             private readonly Task<Task> _complete;
             private readonly CancellationTokenSource _cts;
