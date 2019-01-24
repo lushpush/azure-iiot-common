@@ -27,8 +27,8 @@ namespace Microsoft.Azure.IIoT.Storage.Default {
         /// <inheritdoc/>
         public async Task<IAuditLogWriter> OpenAsync(string log) {
             var database = await _server.OpenAsync();
-            var collection = await database.OpenDocumentCollectionAsync(log);
-            return new CollectionWriter(collection);
+            var collection = await database.OpenContainerAsync(log);
+            return new CollectionWriter(collection.AsDocuments());
         }
 
         /// <summary>
@@ -40,7 +40,7 @@ namespace Microsoft.Azure.IIoT.Storage.Default {
             /// Create writer
             /// </summary>
             /// <param name="collection"></param>
-            public CollectionWriter(IDocumentCollection collection) {
+            public CollectionWriter(IDocuments collection) {
                 _collection = collection;
             }
 
@@ -48,7 +48,7 @@ namespace Microsoft.Azure.IIoT.Storage.Default {
             public Task WriteAsync(AuditLogEntryModel entry) =>
                 _collection.UpsertAsync(entry);
 
-            private readonly IDocumentCollection _collection;
+            private readonly IDocuments _collection;
         }
 
         private readonly ILogger _logger;

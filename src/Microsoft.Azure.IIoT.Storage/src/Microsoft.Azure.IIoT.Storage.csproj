@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>7</LangVersion>
@@ -8,6 +8,14 @@
     <VersionSuffix>prerelease001</VersionSuffix>
     <NoWarn>NU1608;NU5125</NoWarn>
   </PropertyGroup>
+  <ItemGroup>
+    <None Remove="CosmosDb\Script\bulkDelete.js" />
+    <None Remove="CosmosDb\Script\bulkUpdate.js" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="CosmosDb\Script\bulkDelete.js" />
+    <EmbeddedResource Include="CosmosDb\Script\bulkUpdate.js" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Gremlin.Net.CosmosDb" Version="0.3.4.3-rc1" />
     <PackageReference Include="Microsoft.Azure.DocumentDB.Core" Version="2.1.3" />

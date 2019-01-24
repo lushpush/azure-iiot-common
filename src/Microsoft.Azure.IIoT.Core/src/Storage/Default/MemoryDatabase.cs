@@ -17,91 +17,86 @@ namespace Microsoft.Azure.IIoT.Storage.Default {
     /// <summary>
     /// In memory database service (for testing)
     /// </summary>
-    public sealed class MemoryServer : IDatabaseServer {
+    public sealed class MemoryDatabase : IDatabaseServer {
 
         /// <summary>
         /// Create service
         /// </summary>
         /// <param name="logger"></param>
-        public MemoryServer(ILogger logger) {
+        public MemoryDatabase(ILogger logger) {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         /// <inheritdoc/>
         public Task<IDatabase> OpenAsync(string id) {
             return Task.FromResult<IDatabase>(_databases.GetOrAdd(id ?? "",
-                k => new MemoryDatabase(_logger)));
+                k => new ItemContainerDatabase(_logger)));
         }
 
         /// <summary>
         /// In memory database
         /// </summary>
-        private class MemoryDatabase : IDatabase {
+        private class ItemContainerDatabase : IDatabase {
 
             /// <summary>
             /// Create service
             /// </summary>
             /// <param name="logger"></param>
-            public MemoryDatabase(ILogger logger) {
+            public ItemContainerDatabase(ILogger logger) {
                 _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             }
 
             /// <inheritdoc/>
-            public Task DeleteCollectionAsync(string id) {
-                _collections.TryRemove(id, out var tmp);
+            public Task DeleteContainerAsync(string id) {
+                _containers.TryRemove(id, out var tmp);
                 return Task.CompletedTask;
             }
 
             /// <inheritdoc/>
-            public Task<IEnumerable<string>> ListCollectionsAsync(CancellationToken ct) {
-                return Task.FromResult<IEnumerable<string>>(_collections.Keys);
+            public Task<IEnumerable<string>> ListContainersAsync(CancellationToken ct) {
+                return Task.FromResult<IEnumerable<string>>(_containers.Keys);
             }
 
             /// <inheritdoc/>
-            public Task<IDocumentCollection> OpenDocumentCollectionAsync(string id, bool partitioned) {
-                return Task.FromResult<IDocumentCollection>(_collections.GetOrAdd(id ?? "",
-                    k => new MemoryCollection(_logger)));
+            public Task<IItemContainer> OpenContainerAsync(string id, bool partitioned) {
+                return Task.FromResult<IItemContainer>(_containers.GetOrAdd(id ?? "",
+                    k => new ItemContainer(_logger)));
             }
 
-            /// <inheritdoc/>
-            public Task<IGraph> OpenGraphCollectionAsync(string id, bool partitioned) {
-                throw new NotSupportedException();
-            }
-
-            private readonly ConcurrentDictionary<string, MemoryCollection> _collections =
-                new ConcurrentDictionary<string, MemoryCollection>();
+            private readonly ConcurrentDictionary<string, ItemContainer> _containers =
+                new ConcurrentDictionary<string, ItemContainer>();
             private readonly ILogger _logger;
         }
 
         /// <summary>
-        /// In memory collection
+        /// In memory container
         /// </summary>
-        private class MemoryCollection : IDocumentCollection {
+        private class ItemContainer : IDocuments, IItemContainer {
 
             /// <summary>
             /// Create service
             /// </summary>
             /// <param name="logger"></param>
-            public MemoryCollection(ILogger logger) {
+            public ItemContainer(ILogger logger) {
                 _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             }
 
             /// <inheritdoc/>
-            public Task<IDocument<T>> AddAsync<T>(T newItem,
+            public Task<IDocumentInfo<T>> AddAsync<T>(T newItem,
                 CancellationToken ct, string id, string partitionKey) {
                 var newDoc = new Document<T>(id, newItem, partitionKey);
                 lock (_data) {
                     if (_data.TryGetValue(newDoc.Id, out var existing)) {
-                        return Task.FromException<IDocument<T>>(
+                        return Task.FromException<IDocumentInfo<T>>(
                             new ConflictingResourceException(newDoc.Id));
                     }
                     AddDocument(newDoc);
-                    return Task.FromResult<IDocument<T>>(newDoc);
+                    return Task.FromResult<IDocumentInfo<T>>(newDoc);
                 }
             }
 
             /// <inheritdoc/>
-            public Task DeleteAsync<T>(IDocument<T> item, CancellationToken ct) {
+            public Task DeleteAsync<T>(IDocumentInfo<T> item, CancellationToken ct) {
                 if (item == null) {
                     throw new ArgumentNullException(nameof(item));
                 }
@@ -129,22 +124,22 @@ namespace Microsoft.Azure.IIoT.Storage.Default {
             }
 
             /// <inheritdoc/>
-            public Task<IDocument<T>> GetAsync<T>(string id, CancellationToken ct,
+            public Task<IDocumentInfo<T>> GetAsync<T>(string id, CancellationToken ct,
                 string partitionKey) {
                 if (string.IsNullOrEmpty(id)) {
                     throw new ArgumentNullException(nameof(id));
                 }
                 lock (_data) {
                     _data.TryGetValue(id, out var item);
-                    return Task.FromResult(item as IDocument<T>);
+                    return Task.FromResult(item as IDocumentInfo<T>);
                 }
             }
 
             /// <inheritdoc/>
-            public IResultFeed<R> Query<T, R>(Func<IQueryable<IDocument<T>>,
+            public IResultFeed<R> Query<T, R>(Func<IQueryable<IDocumentInfo<T>>,
                 IQueryable<R>> query, int? pageSize, string partitionKey) {
                 var results = query(_data.Values
-                    .OfType<IDocument<T>>()
+                    .OfType<IDocumentInfo<T>>()
                     .AsQueryable())
                     .AsEnumerable();
                 var feed = (pageSize == null) ?
@@ -153,7 +148,7 @@ namespace Microsoft.Azure.IIoT.Storage.Default {
             }
 
             /// <inheritdoc/>
-            public Task<IDocument<T>> ReplaceAsync<T>(IDocument<T> existing, T value,
+            public Task<IDocumentInfo<T>> ReplaceAsync<T>(IDocumentInfo<T> existing, T value,
                 CancellationToken ct) {
                 if (existing == null) {
                     throw new ArgumentNullException(nameof(existing));
@@ -162,35 +157,35 @@ namespace Microsoft.Azure.IIoT.Storage.Default {
                 lock (_data) {
                     if (_data.TryGetValue(newDoc.Id, out var doc)) {
                         if (!string.IsNullOrEmpty(existing.Etag) && doc.Etag != existing.Etag) {
-                            return Task.FromException<IDocument<T>>(
+                            return Task.FromException<IDocumentInfo<T>>(
                                 new ResourceOutOfDateException(existing.Etag));
                         }
                         _data.Remove(newDoc.Id);
                     }
                     else {
-                        return Task.FromException<IDocument<T>>(
+                        return Task.FromException<IDocumentInfo<T>>(
                             new ResourceNotFoundException(newDoc.Id));
                     }
                     AddDocument(newDoc);
-                    return Task.FromResult<IDocument<T>>(newDoc);
+                    return Task.FromResult<IDocumentInfo<T>>(newDoc);
                 }
             }
 
             /// <inheritdoc/>
-            public Task<IDocument<T>> UpsertAsync<T>(T newItem, CancellationToken ct,
+            public Task<IDocumentInfo<T>> UpsertAsync<T>(T newItem, CancellationToken ct,
                 string id, string partitionKey, string etag) {
                 var newDoc = new Document<T>(id, newItem, partitionKey);
                 lock (_data) {
                     if (_data.TryGetValue(newDoc.Id, out var doc)) {
                         if (!string.IsNullOrEmpty(etag) && doc.Etag != etag) {
-                            return Task.FromException<IDocument<T>>(
+                            return Task.FromException<IDocumentInfo<T>>(
                                 new ResourceOutOfDateException(etag));
                         }
                         _data.Remove(newDoc.Id);
                     }
 
                     AddDocument(newDoc);
-                    return Task.FromResult<IDocument<T>>(newDoc);
+                    return Task.FromResult<IDocumentInfo<T>>(newDoc);
                 }
             }
 
@@ -212,7 +207,20 @@ namespace Microsoft.Azure.IIoT.Storage.Default {
             }
 
             /// <inheritdoc/>
-            public ISqlQueryClient OpenSqlQueryClient() {
+            public ISqlClient OpenSqlClient() {
+                throw new NotSupportedException();
+            }
+
+            /// <inheritdoc/>
+            public Task<IDocumentLoader> CreateBulkLoader() {
+                throw new NotSupportedException();
+            }
+
+            /// <inheritdoc/>
+            public IDocuments AsDocuments() => this;
+
+            /// <inheritdoc/>
+            public IGraph AsGraph() {
                 throw new NotSupportedException();
             }
 
@@ -280,7 +288,7 @@ namespace Microsoft.Azure.IIoT.Storage.Default {
             /// <summary>
             /// Wraps a document value
             /// </summary>
-            private class Document<T> : MemoryDocument, IDocument<T> {
+            private class Document<T> : MemoryDocument, IDocumentInfo<T> {
 
                 /// <summary>
                 /// Create memory document
@@ -328,8 +336,8 @@ namespace Microsoft.Azure.IIoT.Storage.Default {
             private readonly ILogger _logger;
         }
 
-        private readonly ConcurrentDictionary<string, MemoryDatabase> _databases =
-            new ConcurrentDictionary<string, MemoryDatabase>();
+        private readonly ConcurrentDictionary<string, ItemContainerDatabase> _databases =
+            new ConcurrentDictionary<string, ItemContainerDatabase>();
         private readonly ILogger _logger;
     }
 }

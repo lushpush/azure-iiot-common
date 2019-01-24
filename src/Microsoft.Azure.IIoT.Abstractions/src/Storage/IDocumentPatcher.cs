@@ -5,22 +5,19 @@
 
 namespace Microsoft.Azure.IIoT.Storage {
     using System.Collections.Generic;
+    using System.Threading.Tasks;
 
     /// <summary>
-    /// Provides sql query capability
+    /// Patch documents using json patch
     /// </summary>
-    public interface ISqlQueryClient {
+    public interface IDocumentPatcher {
 
         /// <summary>
-        /// Query items
+        /// Patch document using json patch operations
         /// </summary>
-        /// <param name="queryString"></param>
-        /// <param name="parameters"></param>
-        /// <param name="pageSize"></param>
-        /// <param name="partitionKey"></param>
+        /// <param name="id"></param>
+        /// <param name="patches"></param>
         /// <returns></returns>
-        IResultFeed<IDocument<T>> Query<T>(string queryString,
-            IDictionary<string, object> parameters = null,
-            int? pageSize = null, string partitionKey = null);
+        Task PatchAsync(string id, IEnumerable<string> patches);
     }
 }

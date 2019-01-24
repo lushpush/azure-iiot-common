@@ -66,8 +66,8 @@ namespace Microsoft.Azure.IIoT.Storage.Cli {
         /// Dump all documents using sql
         /// </summary>
         public static async Task DumpCollectionAsync(CliOptions options) {
-            var collection = await GetCollectionAsync(options);
-            var queryable = collection.OpenSqlQueryClient();
+            var collection = await GetDocsAsync(options);
+            var queryable = collection.OpenSqlClient();
             var feed = queryable.Query<dynamic>("select * from root");
             while (feed.HasMore()) {
                 var result = await feed.ReadAsync();
@@ -298,10 +298,11 @@ Commands and Options
         /// </summary>
         /// <param name="options"></param>
         /// <returns></returns>
-        private static async Task<IDocumentCollection> GetCollectionAsync(CliOptions options) {
+        private static async Task<IDocuments> GetDocsAsync(CliOptions options) {
             var database = await GetDatabaseAsync(options);
-            return await database.OpenDocumentCollectionAsync(
+            var coll = await database.OpenContainerAsync(
                 options.GetValueOrDefault("-c", "--collection", "default"));
+            return coll.AsDocuments();
         }
 
         /// <summary>
@@ -311,8 +312,9 @@ Commands and Options
         /// <returns></returns>
         private static async Task<IGraph> GetGraphAsync(CliOptions options) {
             var database = await GetDatabaseAsync(options);
-            return await database.OpenGraphCollectionAsync(
+            var coll = await database.OpenContainerAsync(
                 options.GetValueOrDefault("-c", "--collection", "default"));
+            return coll.AsGraph();
         }
 
         /// <summary>

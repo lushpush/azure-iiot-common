@@ -8,14 +8,15 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
     using Microsoft.Azure.Documents.Client;
     using Microsoft.Azure.Documents;
     using System;
-    using System.Text;
-    using System.Net;
-    using System.IO;
     using System.Linq;
     using System.Threading.Tasks;
     using System.Threading;
     using System.Collections.Concurrent;
     using System.Collections.Generic;
+    using System.IO;
+    using System.Text;
+    using System.Net;
+    using CosmosContainer = Documents.DocumentCollection;
 
     /// <summary>
     /// Provides document db database interface.
@@ -46,15 +47,11 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         }
 
         /// <inheritdoc/>
-        public async Task<IDocumentCollection> OpenDocumentCollectionAsync(string id,
+        public async Task<IItemContainer> OpenContainerAsync(string id,
             bool partitioned) => await OpenOrCreateCollectionAsync(id, partitioned);
 
         /// <inheritdoc/>
-        public async Task<IGraph> OpenGraphCollectionAsync(string id,
-            bool partitioned) => await OpenOrCreateCollectionAsync(id, partitioned);
-
-        /// <inheritdoc/>
-        public async Task<IEnumerable<string>> ListCollectionsAsync(CancellationToken ct) {
+        public async Task<IEnumerable<string>> ListContainersAsync(CancellationToken ct) {
             var continuation = string.Empty;
             var result = new List<string>();
             do {
@@ -71,7 +68,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         }
 
         /// <inheritdoc/>
-        public async Task DeleteCollectionAsync(string id) {
+        public async Task DeleteContainerAsync(string id) {
             if (string.IsNullOrEmpty(id)) {
                 throw new ArgumentNullException(nameof(id));
             }
@@ -111,7 +108,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         /// <param name="id"></param>
         /// <param name="partitioned"></param>
         /// <returns></returns>
-        private async Task<Documents.DocumentCollection> EnsureCollectionExists(string id,
+        private async Task<CosmosContainer> EnsureCollectionExists(string id,
             bool partitioned) {
             var database = await Client.CreateDatabaseIfNotExistsAsync(
                 new Database {
@@ -119,7 +116,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
                 }
             );
 
-            var collectionDefinition = new Documents.DocumentCollection {
+            var container = new CosmosContainer {
                 Id = id,
                 DefaultTimeToLive = -1, // Infinite
                 IndexingPolicy = new IndexingPolicy(new RangeIndex(DataType.String) {
@@ -128,19 +125,66 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
             };
 
             if (partitioned) {
-                collectionDefinition.PartitionKey.Paths.Add(
-                    "/" + DocumentCollection.kPartitionKeyProperty);
+                container.PartitionKey.Paths.Add("/" +
+                    DocumentCollection.kPartitionKeyProperty);
             }
 
             var throughput = 10000;
             var collection = await Client.CreateDocumentCollectionIfNotExistsAsync(
                  UriFactory.CreateDatabaseUri(DatabaseId),
-                 collectionDefinition,
+                 container,
                  new RequestOptions {
                      OfferThroughput = throughput
                  }
             );
+            await CreateSprocIfNotExists(id, kBulkUpdateSprocName);
+            await CreateSprocIfNotExists(id, kBulkDeleteSprocName);
             return collection.Resource;
+        }
+
+        internal const string kBulkUpdateSprocName = "bulkUpdate";
+        internal const string kBulkDeleteSprocName = "bulkDelete";
+
+        /// <summary>
+        /// Create stored procedures
+        /// </summary>
+        /// <param name="collectionId"></param>
+        /// <param name="sprocName"></param>
+        /// <returns></returns>
+        private async Task CreateSprocIfNotExists(string collectionId, string sprocName) {
+            var assembly = GetType().Assembly;
+#if FALSE
+            try {
+                var sprocUri = UriFactory.CreateStoredProcedureUri(
+                    DatabaseId, collectionId, sprocName);
+                await _client.DeleteStoredProcedureAsync(sprocUri);
+            }
+            catch (DocumentClientException) {}
+#endif
+            var resource = $"{assembly.GetName().Name}.CosmosDb.Script.{sprocName}.js";
+            using (var stream = assembly.GetManifestResourceStream(resource)) {
+                if (stream == null) {
+                    throw new FileNotFoundException(resource + " not found");
+                }
+                var sproc = new StoredProcedure {
+                    Id = sprocName,
+                    Body = stream.ReadAsString(Encoding.UTF8)
+                };
+                try {
+                    var sprocUri = UriFactory.CreateStoredProcedureUri(
+                        DatabaseId, collectionId, sprocName);
+                    await Client.ReadStoredProcedureAsync(sprocUri);
+                    return;
+                }
+                catch (DocumentClientException de) {
+                    if (de.StatusCode != HttpStatusCode.NotFound) {
+                        throw;
+                    }
+                }
+                await Client.CreateStoredProcedureAsync(
+                    UriFactory.CreateDocumentCollectionUri(DatabaseId,
+                    collectionId), sproc);
+            }
         }
 
         private readonly ILogger _logger;

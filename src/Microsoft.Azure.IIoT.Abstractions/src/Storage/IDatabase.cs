@@ -20,17 +20,7 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// <param name="id"></param>
         /// <param name="partitioned"></param>
         /// <returns></returns>
-        Task<IDocumentCollection> OpenDocumentCollectionAsync(
-            string id = null, bool partitioned = false);
-
-        /// <summary>
-        /// Opens or creates a (default) collection as a
-        /// collection of graph elements.
-        /// </summary>
-        /// <param name="id"></param>
-        /// <param name="partitioned"></param>
-        /// <returns></returns>
-        Task<IGraph> OpenGraphCollectionAsync(
+        Task<IItemContainer> OpenContainerAsync(
             string id = null, bool partitioned = false);
 
         /// <summary>
@@ -38,7 +28,7 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// </summary>
         /// <param name="ct"></param>
         /// <returns></returns>
-        Task<IEnumerable<string>> ListCollectionsAsync(
+        Task<IEnumerable<string>> ListContainersAsync(
             CancellationToken ct = default(CancellationToken));
 
         /// <summary>
@@ -46,6 +36,6 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// </summary>
         /// <param name="id"></param>
         /// <returns></returns>
-        Task DeleteCollectionAsync(string id = null);
+        Task DeleteContainerAsync(string id = null);
     }
 }

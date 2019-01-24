@@ -6,28 +6,22 @@
 namespace Microsoft.Azure.IIoT.Storage {
 
     /// <summary>
-    /// Document in the document database
+    /// A container of items
     /// </summary>
-    public interface IDocument<T> {
+    public interface IItemContainer {
 
         /// <summary>
-        /// Id of the resource
+        /// Presents the items as documents
         /// </summary>
-        string Id { get; }
+        /// <exception cref="System.NotSupportedException" />
+        /// <returns></returns>
+        IDocuments AsDocuments();
 
         /// <summary>
-        /// Value
+        /// Presents the items as graph
         /// </summary>
-        T Value { get; }
-
-        /// <summary>
-        /// Partition key of the value
-        /// </summary>
-        string PartitionKey { get; }
-
-        /// <summary>
-        /// Etag of the document
-        /// </summary>
-        string Etag { get; }
+        /// <exception cref="System.NotSupportedException" />
+        /// <returns></returns>
+        IGraph AsGraph();
     }
 }

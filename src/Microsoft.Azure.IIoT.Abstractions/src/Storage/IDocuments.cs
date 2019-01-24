@@ -11,9 +11,9 @@ namespace Microsoft.Azure.IIoT.Storage {
     using System.Threading.Tasks;
 
     /// <summary>
-    /// Represents a collection of documents
+    /// Represents documents in the database
     /// </summary>
-    public interface IDocumentCollection {
+    public interface IDocuments {
 
         /// <summary>
         /// Add new item
@@ -23,7 +23,7 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// <param name="id"></param>
         /// <param name="partitionKey"></param>
         /// <returns></returns>
-        Task<IDocument<T>> AddAsync<T>(T newItem,
+        Task<IDocumentInfo<T>> AddAsync<T>(T newItem,
             CancellationToken ct = default(CancellationToken),
             string id = null, string partitionKey = null);
 
@@ -34,7 +34,7 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// <param name="ct"></param>
         /// <param name="partitionKey"></param>
         /// <returns></returns>
-        Task<IDocument<T>> GetAsync<T>(string id,
+        Task<IDocumentInfo<T>> GetAsync<T>(string id,
             CancellationToken ct = default(CancellationToken),
             string partitionKey = null);
 
@@ -45,7 +45,7 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// <param name="value"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        Task<IDocument<T>> ReplaceAsync<T>(IDocument<T> existing,
+        Task<IDocumentInfo<T>> ReplaceAsync<T>(IDocumentInfo<T> existing,
             T value, CancellationToken ct = default(CancellationToken));
 
         /// <summary>
@@ -58,7 +58,7 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// <param name="partitionKey"></param>
         /// <param name="etag"></param>
         /// <returns></returns>
-        Task<IDocument<T>> UpsertAsync<T>(T newItem,
+        Task<IDocumentInfo<T>> UpsertAsync<T>(T newItem,
             CancellationToken ct = default(CancellationToken),
             string id = null, string partitionKey = null,
             string etag = null);
@@ -71,15 +71,8 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// <param name="pageSize"></param>
         /// <returns></returns>
         IResultFeed<R> Query<T, R>(
-            Func<IQueryable<IDocument<T>>, IQueryable<R>> query,
+            Func<IQueryable<IDocumentInfo<T>>, IQueryable<R>> query,
             int? pageSize = null, string partitionKey = null);
-
-        /// <summary>
-        /// Query using sql. If not supported will throw.
-        /// </summary>
-        /// <exception cref="NotSupportedException"/>
-        /// <returns></returns>
-        ISqlQueryClient OpenSqlQueryClient();
 
         /// <summary>
         /// Removes the item.
@@ -88,7 +81,7 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// <param name="item"></param>
         /// <param name="ct"></param>
         /// <returns></returns>
-        Task DeleteAsync<T>(IDocument<T> item,
+        Task DeleteAsync<T>(IDocumentInfo<T> item,
             CancellationToken ct = default(CancellationToken));
 
         /// <summary>
@@ -102,5 +95,19 @@ namespace Microsoft.Azure.IIoT.Storage {
         Task DeleteAsync(string id,
             CancellationToken ct = default(CancellationToken),
             string partitionKey = null, string etag = null);
+
+        /// <summary>
+        /// Query using sql. If not supported will throw.
+        /// </summary>
+        /// <exception cref="NotSupportedException"/>
+        /// <returns></returns>
+        ISqlClient OpenSqlClient();
+
+        /// <summary>
+        /// Open bulk loader if supported
+        /// </summary>
+        /// <exception cref="System.NotSupportedException"/>
+        /// <returns></returns>
+        Task<IDocumentLoader> CreateBulkLoader();
     }
 }
