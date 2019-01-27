@@ -4,6 +4,7 @@
 // ------------------------------------------------------------
 
 namespace Microsoft.Azure.IIoT.Storage {
+    using System;
     using System.Collections.Generic;
     using System.Threading;
     using System.Threading.Tasks;
@@ -11,7 +12,7 @@ namespace Microsoft.Azure.IIoT.Storage {
     /// <summary>
     /// Provides sql capability
     /// </summary>
-    public interface ISqlClient {
+    public interface ISqlClient : IDisposable {
 
         /// <summary>
         /// Query items

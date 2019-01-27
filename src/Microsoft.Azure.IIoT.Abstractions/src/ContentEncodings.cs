@@ -47,6 +47,11 @@ namespace Microsoft.Azure.IIoT {
         /// </summary>
         public const string MimeTypeUaXml =
             "application/ua+xml";
+        /// <summary>
+        /// OPC UA nodset xml encoding
+        /// </summary>
+        public const string MimeTypeUaNodesetXml =
+            "application/ua-nodeset+xml";
 
         /// <summary>
         /// (For testing) Reference encoder

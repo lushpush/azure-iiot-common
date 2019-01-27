@@ -37,12 +37,13 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         /// Creates database
         /// </summary>
         /// <param name="client"></param>
-        /// <param name="id"></param>
+        /// <param name="databaseId"></param>
         /// <param name="logger"></param>
-        public DocumentDatabase(DocumentClient client, string id, ILogger logger) {
-            _logger = logger;
-            Client = client;
-            DatabaseId = id;
+        internal DocumentDatabase(DocumentClient client, string databaseId,
+            ILogger logger) {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            Client = client ?? throw new ArgumentNullException(nameof(client));
+            DatabaseId = databaseId ?? throw new ArgumentNullException(nameof(databaseId));
             _collections = new ConcurrentDictionary<string, DocumentCollection>();
         }
 

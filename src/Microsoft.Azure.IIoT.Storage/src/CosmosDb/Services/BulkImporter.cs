@@ -27,8 +27,8 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         /// <param name="bulkSize"></param>
         internal BulkImporter(IBulkExecutor executor, ILogger logger,
             bool addOnly = false, int bulkSize = 10000) {
-            _executor = executor;
-            _logger = logger;
+            _executor = executor ?? throw new ArgumentNullException(nameof(executor));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _bulkSize = bulkSize;
             _addOnly = addOnly;
 

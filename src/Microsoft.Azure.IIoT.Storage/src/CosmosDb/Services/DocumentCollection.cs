@@ -12,6 +12,7 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
     using Microsoft.Azure.Documents;
     using Microsoft.Azure.Documents.Client;
     using Microsoft.Azure.Documents.Linq;
+    using Microsoft.Azure.CosmosDB.BulkExecutor;
     using Microsoft.Azure.CosmosDB.BulkExecutor.Graph;
     using System;
     using System.Collections.Generic;
@@ -24,13 +25,11 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
     using Gremlin.Net.CosmosDb.Structure;
     using Gremlin.Net.Process.Traversal;
     using CosmosContainer = Documents.DocumentCollection;
-    using Microsoft.Azure.CosmosDB.BulkExecutor;
 
     /// <summary>
     /// Wraps a cosmos db container
     /// </summary>
-    sealed class DocumentCollection : IItemContainer,
-        IGraph, IDocuments, ISqlClient {
+    sealed class DocumentCollection : IItemContainer, IGraph, IDocuments {
 
         /// <summary>
         /// Wrapped document collection instance
@@ -46,10 +45,10 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         /// <param name="logger"></param>
         internal DocumentCollection(DocumentDatabase db, CosmosContainer container,
             bool partitioned, ILogger logger) {
-            Container = container;
-            _logger = logger;
+            Container = container ?? throw new ArgumentNullException(nameof(container));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _db = db ?? throw new ArgumentNullException(nameof(db));
             _partitioned = partitioned;
-            _db = db;
         }
 
         /// <inheritdoc/>
@@ -94,70 +93,16 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
         }
 
         /// <inheritdoc/>
-        public ISqlClient OpenSqlClient() => this;
+        public IDocuments AsDocuments() =>
+            this;
 
         /// <inheritdoc/>
-        public IDocuments AsDocuments() => this;
+        public IGraph AsGraph() =>
+            this;
 
         /// <inheritdoc/>
-        public IGraph AsGraph() => this;
-
-        /// <inheritdoc/>
-        public IResultFeed<IDocumentInfo<T>> Query<T>(string queryString,
-            IDictionary<string, object> parameters, int? pageSize, string partitionKey) {
-            if (string.IsNullOrEmpty(queryString)) {
-                throw new ArgumentNullException(nameof(queryString));
-            }
-            var pk = _partitioned || string.IsNullOrEmpty(partitionKey) ? null :
-                new PartitionKey(partitionKey);
-            var query = _db.Client.CreateDocumentQuery<Document>(
-                UriFactory.CreateDocumentCollectionUri(_db.DatabaseId, Container.Id),
-                new SqlQuerySpec {
-                    QueryText = queryString,
-                    Parameters = new SqlParameterCollection(parameters?
-                        .Select(kv => new SqlParameter(kv.Key, kv.Value)) ??
-                            Enumerable.Empty<SqlParameter>())
-                },
-                new FeedOptions {
-                    MaxDegreeOfParallelism = 8,
-                    MaxItemCount = pageSize ?? -1,
-                    PartitionKey = pk,
-                    EnableCrossPartitionQuery = pk == null
-                }).Select(d => (IDocumentInfo<T>)new DocumentInfo<T>(d));
-            return new DocumentFeed<IDocumentInfo<T>>(query.AsDocumentQuery(), _logger);
-        }
-
-        /// <inheritdoc/>
-        public async Task DropAsync(string queryString,
-            IDictionary<string, object> parameters, string partitionKey,
-            CancellationToken ct) {
-            var query = new SqlQuerySpec {
-                QueryText = queryString,
-                Parameters = new SqlParameterCollection(parameters?
-                    .Select(kv => new SqlParameter(kv.Key, kv.Value)) ??
-                        Enumerable.Empty<SqlParameter>())
-            };
-            var uri = UriFactory.CreateStoredProcedureUri(_db.DatabaseId, Container.Id,
-                DocumentDatabase.kBulkDeleteSprocName);
-            var pk = _partitioned || string.IsNullOrEmpty(partitionKey) ? null :
-                new PartitionKey(partitionKey);
-            await Retry.WithExponentialBackoff(_logger, ct, async () => {
-                while (true) {
-                    try {
-                        dynamic scriptResult =
-                            await _db.Client.ExecuteStoredProcedureAsync<dynamic>(uri,
-                            new RequestOptions { PartitionKey = pk }, query, ct);
-                        _logger.Debug($"  {scriptResult.deleted} items deleted.");
-                        if (!scriptResult.continuation) {
-                            break;
-                        }
-                    }
-                    catch (Exception ex) {
-                        FilterException(ex);
-                    }
-                }
-            });
-        }
+        public ISqlClient OpenSqlClient() => new DocumentQuery(
+            _db.Client, _db.DatabaseId, Container.Id, _partitioned, _logger);
 
         /// <inheritdoc/>
         async Task<IGraphLoader> IGraph.CreateBulkLoader() {
@@ -353,36 +298,6 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
             client.ConnectionPolicy.RetryOptions.MaxRetryWaitTimeInSeconds = 30;
             client.ConnectionPolicy.RetryOptions.MaxRetryAttemptsOnThrottledRequests = 9;
             return client;
-        }
-
-        /// <summary>
-        /// Cosmos db document wrapper
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        internal sealed class DocumentInfo<T> : IDocumentInfo<T> {
-
-            /// <summary>
-            /// Create document
-            /// </summary>
-            /// <param name="doc"></param>
-            public DocumentInfo(Document doc) {
-                _doc = doc;
-            }
-
-            /// <inheritdoc/>
-            public string Id => _doc.Id;
-
-            /// <inheritdoc/>
-            public T Value => (T)(dynamic)_doc;
-
-            /// <inheritdoc/>
-            public string PartitionKey => _doc.GetPropertyValue<string>(
-                kPartitionKeyProperty);
-
-            /// <inheritdoc/>
-            public string Etag => _doc.ETag;
-
-            private readonly Document _doc;
         }
 
         /// <summary>

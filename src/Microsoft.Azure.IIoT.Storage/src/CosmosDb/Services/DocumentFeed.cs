@@ -16,18 +16,18 @@ namespace Microsoft.Azure.IIoT.Storage.CosmosDb.Services {
     /// <summary>
     /// Wraps a document query to return statements
     /// </summary>
-    internal class DocumentFeed<T> : IResultFeed<T> {
+    sealed class DocumentFeed<T> : IResultFeed<T> {
 
         /// <summary>
         /// Create feed
         /// </summary>
         internal DocumentFeed(IDocumentQuery<T> query, ILogger logger) {
-            _query = query;
-            _logger = logger;
+            _query = query ?? throw new ArgumentNullException(nameof(query));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         /// <inheritdoc/>
-        public virtual async Task<IEnumerable<T>> ReadAsync(CancellationToken ct) {
+        public async Task<IEnumerable<T>> ReadAsync(CancellationToken ct) {
             return await Retry.WithExponentialBackoff(_logger, ct, async () => {
                 if (_query.HasMoreResults) {
                     try {
