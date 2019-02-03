@@ -14,6 +14,17 @@ namespace System {
     public static class ObjectEx {
 
         /// <summary>
+        /// Make nullable version
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="value"></param>
+        /// <param name="nil"></param>
+        /// <returns></returns>
+        public static T? ToNullable<T>(this T value, T nil) where T : struct {
+            return EqualityComparer<T>.Default.Equals(value, nil) ? (T?)null : value;
+        }
+
+        /// <summary>
         /// Safe equals
         /// </summary>
         /// <param name="obj"></param>
