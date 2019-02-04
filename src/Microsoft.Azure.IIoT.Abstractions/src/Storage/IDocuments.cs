@@ -106,7 +106,7 @@ namespace Microsoft.Azure.IIoT.Storage {
         /// <summary>
         /// Open bulk loader if supported
         /// </summary>
-        /// <exception cref="System.NotSupportedException"/>
+        /// <exception cref="NotSupportedException"/>
         /// <returns></returns>
         Task<IDocumentLoader> CreateBulkLoader();
     }

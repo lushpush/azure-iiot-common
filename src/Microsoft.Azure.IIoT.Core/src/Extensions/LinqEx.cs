@@ -27,6 +27,18 @@ namespace System.Linq {
         }
 
         /// <summary>
+        /// Creates a list from enumerable or null if enumerable is null.
+        /// </summary>
+        /// <param name="enumerable"></param>
+        /// <returns></returns>
+        public static List<T> ToListSafe<T>(this IEnumerable<T> enumerable) {
+            if (enumerable == null) {
+                return null;
+            }
+            return new List<T>(enumerable);
+        }
+
+        /// <summary>
         /// Creates a sorted set from enumerable or null if enumerable is null.
         /// </summary>
         /// <param name="enumerable"></param>
